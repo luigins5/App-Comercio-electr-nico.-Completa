@@ -5,7 +5,7 @@
  */
 
 // ============== Configuration ==============
-var APP_NAME = 'Soft Drink Shop';
+var APP_NAME = 'Tienda de Bebidas';
 var USERS_SHEET = 'USERS', LOGS_SHEET = 'LOGS', ROLES_SHEET = 'ROLES', SETTINGS_SHEET = 'SETTINGS', RESETS_SHEET = 'PASSWORD_RESETS',
     ASSETS_FOLDER_NAME = 'ASSETS', RECEIPTS_FOLDER_NAME = 'Shop Receipts (private)';
 var CAT_SHEET = 'CATEGORIES', PROD_SHEET = 'PRODUCTS', ADDON_SHEET = 'ADDONS', PM_SHEET = 'PAYMENT_METHODS', ORDER_SHEET = 'ORDERS';
@@ -23,25 +23,25 @@ var ROLE_C = { KEY:0, LABEL:1, COLOR:2, SORT:3, SUPER:4, HIDDEN:5, PERMS:6 };
 
 // pages the matrix governs (account = always-on, permissions = editor-only — not listed here)
 var RBAC_PAGES = [
-  { key:'dashboard',  label:'Dashboard',       group:'General' },
-  { key:'orders',     label:'Orders',          group:'Orders' },
-  { key:'products',   label:'Products',        group:'Menu' },
-  { key:'categories', label:'Categories',      group:'Menu' },
-  { key:'addons',     label:'Add-ons',         group:'Menu' },
-  { key:'customers',  label:'Customers',       group:'Sales' },
-  { key:'reports',    label:'Reports',         group:'Sales' },
-  { key:'paymethods', label:'Payment Methods', group:'Setup' },
-  { key:'settings',   label:'Settings',        group:'Setup' },
-  { key:'users',      label:'Users',           group:'System' },
-  { key:'logs',       label:'Activity Logs',   group:'System' },
-  { key:'mysettings', label:'My Settings',     group:'System' },
-  { key:'about',      label:'About',           group:'System' }
+  { key:'dashboard',  label:'Panel de control',    group:'General' },
+  { key:'orders',     label:'Pedidos',             group:'Pedidos' },
+  { key:'products',   label:'Productos',           group:'Menú' },
+  { key:'categories', label:'Categorías',          group:'Menú' },
+  { key:'addons',     label:'Complementos',        group:'Menú' },
+  { key:'customers',  label:'Clientes',            group:'Ventas' },
+  { key:'reports',    label:'Reportes',            group:'Ventas' },
+  { key:'paymethods', label:'Métodos de pago',     group:'Configuración' },
+  { key:'settings',   label:'Configuración',       group:'Configuración' },
+  { key:'users',      label:'Usuarios',            group:'Sistema' },
+  { key:'logs',       label:'Registro de actividad', group:'Sistema' },
+  { key:'mysettings', label:'Mis ajustes',         group:'Sistema' },
+  { key:'about',      label:'Acerca de',           group:'Sistema' }
 ];
 
 // roles — keys MATCH USERS.Role values; Customer is the self-signup role (Active on signup, storefront only)
 var RBAC_ROLE_DEFS = [
-  { key:'Admin',    label:'Admin',    color:'#6a1b9a', is_super:1, hidden_signup:1 },
-  { key:'Customer', label:'Customer', color:'#0074D9', is_super:0, hidden_signup:0 }
+  { key:'Admin',    label:'Administrador', color:'#6a1b9a', is_super:1, hidden_signup:1 },
+  { key:'Customer', label:'Cliente',       color:'#0074D9', is_super:0, hidden_signup:0 }
 ];
 
 var RBAC_EDIT_ROLES = ['Admin']; // who may open/edit the matrix
@@ -85,7 +85,7 @@ var CACHE_TTL = 21600, UIX_TTL = 1800, SESSION_TTL = 3600;   // roles 6h · iden
 var cachePut_ = function(k, v, ttl){ var s = JSON.stringify(v); if (s.length < 95000) CACHE_.put(k, s, ttl); };   // 100 KB/value cap
 
 var userRows_ = function(){ return _m.users || (_m.users = (function(){
-  var s = sh_(USERS_SHEET); if (!s) throw 'Users sheet not found';
+  var s = sh_(USERS_SHEET); if (!s) throw 'Hoja de usuarios no encontrada';
   var d = s.getDataRange().getValues(), ix = {};
   for (var i = 1; i < d.length; i++) ix[String(d[i][U.NAME])] = i;   // decorate once: name -> row idx
   return { sh:s, data:d, ix:ix }; })()); };
@@ -106,7 +106,7 @@ var emailTaken_ = function(u, email, self){ email = String(email).trim().toLower
 function userExtra_(d, cur) {
   var full = String(d.FullName || '').trim().slice(0, 80), phone = String(d.Phone == null ? '' : d.Phone).trim().slice(0, 20),
       addr = String(d.Address == null ? '' : d.Address).trim().slice(0, 300);
-  if (phone && !PHONE_RX.test(phone)) fail_('Phone: 7-20 digits (spaces and a leading + allowed)');
+  if (phone && !PHONE_RX.test(phone)) fail_('Teléfono: 7-20 dígitos (se permiten espacios y un + al inicio)');
   return { full:full || (cur ? String(cur[U.FULL] || '') : ''), phone:phone, addr:addr };
 }
 
@@ -160,23 +160,25 @@ var whoMaybe_ = function(tok){ try { return tok ? who_(tok) : null; } catch (e) 
 function api_(tok, page, perm, fn) {
   try {
     var me = who_(tok);
-    if (page && !(page === 'rbac' ? canEditRbac_(me.role) : hasPerm_(me.role, page, perm))) return err_('Access denied');
+    if (page && !(page === 'rbac' ? canEditRbac_(me.role) : hasPerm_(me.role, page, perm))) return err_('Acceso denegado');
     return fn(me);
   } catch (e) {
-    if (e === AUTH) return { success:false, code:AUTH, message:'Session expired. Please login again.' };
+    if (e === AUTH) return { success:false, code:AUTH, message:'La sesión ha expirado. Por favor, inicia sesión nuevamente.' };
     return e && e.user ? err_(e.user) : err_('Error: ' + ((e && e.message) || e));
   }
 }
 // public funnel: no session needed, the same clean error shape
 function pub_(fn) {
   try { return fn(); }
-  catch (e) { return e && e.user ? err_(e.user) : err_('Something went wrong — please try again'); }
+  catch (e) { return e && e.user ? err_(e.user) : err_('Algo salió mal — por favor intenta de nuevo'); }
 }
 
 // ============== Main Web App Entry Point ==============
 var bootTok_ = function(v){ return String(v || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 64); };
 function doGet(e) {
-  var t = HtmlService.createTemplateFromFile('index'), p = PropertiesService.getScriptProperties().getProperties(), q = (e && e.parameter) || {};
+  var t;
+  try { t = HtmlService.createTemplateFromFile('Index'); } catch (err) { t = HtmlService.createTemplateFromFile('index'); }
+  var p = PropertiesService.getScriptProperties().getProperties(), q = (e && e.parameter) || {};
   t.defaultThemeVars = themeVarsSafe_(p.DEFAULT_THEME_VARS);   // zero-flash first paint (printed raw, so re-checked)
   t.defaultThemeId = themeIdSafe_(p.DEFAULT_THEME_ID);
   // ?reset= / ?track= / ?page= — the app runs in a sandbox iframe, so it can't read the top URL itself
@@ -222,15 +224,15 @@ function sessionOut_(r) {
 function authenticateUser(username, password) {
   try {
     var name = String(username || '').trim().slice(0, 100), lk = 'lf_' + name.toLowerCase(), fails = Number(CACHE_.get(lk)) || 0;
-    if (fails >= LOGIN_MAX) { addLog_(name, 'Login Blocked', 'Too many failed attempts'); return err_('Too many failed attempts. Try again in 15 minutes.'); }
-    var bad = function(msg, why){ CACHE_.put(lk, String(fails + 1), LOGIN_LOCK); addLog_(name, 'Login Failed', why); return err_(msg); };
+    if (fails >= LOGIN_MAX) { addLog_(name, 'Inicio Bloqueado', 'Demasiados intentos fallidos'); return err_('Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.'); }
+    var bad = function(msg, why){ CACHE_.put(lk, String(fails + 1), LOGIN_LOCK); addLog_(name, 'Inicio Fallido', why); return err_(msg); };
     var u = userRows_(), i = findLogin_(u, name);
-    if (i === -1) return bad('Invalid email/username or password', 'Account not found');   // same message either way
+    if (i === -1) return bad('Correo/usuario o contraseña no válidos', 'Cuenta no encontrada');   // mismo mensaje para ambos
     var r = u.data[i];
-    if (r[U.STATUS] !== 'Active') return bad('Account is inactive. Please contact the shop.', 'Account is inactive');
-    if (String(password) !== String(r[U.PWD])) return bad('Invalid email/username or password', 'Invalid password'); // sheet coerces numeric pwds
-    CACHE_.remove(lk); uix_();                                                              // warm the identity cache from the read we hold
-    addLog_(r[U.NAME], 'Login Success', 'User logged in successfully');
+    if (r[U.STATUS] !== 'Active') return bad('La cuenta está inactiva. Comunícate con la tienda.', 'Cuenta inactiva');
+    if (String(password) !== String(r[U.PWD])) return bad('Correo/usuario o contraseña no válidos', 'Contraseña incorrecta');
+    CACHE_.remove(lk); uix_();                                                              // calentar caché de identidad
+    addLog_(r[U.NAME], 'Inicio Exitoso', 'Sesión iniciada exitosamente');
     return sessionOut_(r);
   } catch (e) { return err_('Error: ' + e); }
 }
@@ -238,7 +240,7 @@ function authenticateUser(username, password) {
 function logout(tok) { if (tok && typeof tok === 'string') CACHE_.remove('s_' + tok); return ok_(); }
 
 // ============== Signup + Forgot / Reset password (public) ==============
-var RESET_TTL = 3600000, PUB_MAX = 5, PUB_WINDOW = 3600;   // reset link 1h · 5 requests per hour per email
+var RESET_TTL = 3600000, PUB_MAX = 5, PUB_WINDOW = 3600;   // enlace de restablecimiento 1h · 5 solicitudes por hora por correo
 var TOKEN_RX = /^[0-9a-f-]{36}$/i;
 // cheap per-key throttle for the public endpoints (signup / forgot / track)
 var throttled_ = function(k, max, win){ var n = Number(CACHE_.get(k)) || 0; if (n >= (max || PUB_MAX)) return true; CACHE_.put(k, String(n + 1), win || PUB_WINDOW); return false; };
@@ -250,21 +252,21 @@ function signup(d) {
   try {
     d = d || {};
     var email = String(d.email || '').trim().toLowerCase(), pwd = String(d.password || ''), full = String(d.name || '').trim(), phone = String(d.phone || '').trim();
-    if (full.length < 2) return err_('Enter your name');
-    if (!EMAIL_RX.test(email) || email.length > 100) return err_('Enter a valid email');
-    if (!PHONE_RX.test(phone)) return err_('Phone: 7-20 digits (spaces and a leading + allowed)');
-    if (pwd.length < 8) return err_('Password must be at least 8 characters');
+    if (full.length < 2) return err_('Ingresa tu nombre');
+    if (!EMAIL_RX.test(email) || email.length > 100) return err_('Ingresa un correo electrónico válido');
+    if (!PHONE_RX.test(phone)) return err_('Teléfono: 7-20 dígitos (se permiten espacios y un + al inicio)');
+    if (pwd.length < 8) return err_('La contraseña debe tener al menos 8 caracteres');
     var role = signupRole_();
-    if (!role) return err_('Sign-up is closed — please order as a guest');
-    if (throttled_('su_' + email)) return err_('Too many attempts. Try again later.');
+    if (!role) return err_('El registro está cerrado — por favor realiza tu pedido como invitado');
+    if (throttled_('su_' + email)) return err_('Demasiados intentos. Intenta más tarde.');
     var out = withLock_(function(){
       var u = userRows_();
-      if (uRow_(u, email) !== -1 || emailTaken_(u, email, '')) return err_('That email already has an account — sign in instead');
+      if (uRow_(u, email) !== -1 || emailTaken_(u, email, '')) return err_('Ese correo ya tiene una cuenta registrada — inicia sesión');
       var row = userRow_({ name:email, email:email, pwd:pwd, role:role, status:'Active', by:'signup', full:full.slice(0, 80), phone:phone, addr:String(d.address || '').trim().slice(0, 300) });
       putText_(u.sh, u.data.length + 1, [row]);
       ixPatch_(function(ix){ ix[email] = [role, 'Active']; });
-      addLog_(email, 'SIGNUP', 'Customer account created');
-      var c = d.claim || {}, o = c.order_no ? findOrder_(c.order_no) : null;                // "create an account with these details" after a guest order
+      addLog_(email, 'REGISTRO', 'Cuenta de cliente creada');
+      var c = d.claim || {}, o = c.order_no ? findOrder_(c.order_no) : null;                // vincular pedido de invitado
       if (o && o.track_token === String(c.track_token || '') && !o.customer_username)
         JDB.update(ORDER_SHEET, o.id, { customer_username:email }, ymd_(o.placed_at));
       return sessionOut_(row);
@@ -272,12 +274,12 @@ function signup(d) {
     if (out && out.success) { var st = settings_(), who = { name:full, email:email, phone:phone };
       mailSend_('customer.welcome', null, st, who); mailSend_('shop.signup', null, st, who); }
     return out;
-  } catch (e) { return err_('Signup failed — please try again'); }
+  } catch (e) { return err_('Error al registrarse — por favor intenta de nuevo'); }
 }
 
 // always the same answer — never reveals whether an account exists
 function forgotPassword(ident) {
-  var done = ok_({ message:'If that account exists, a reset link has been sent to its email.' });
+  var done = ok_({ message:'Si la cuenta existe, se ha enviado un enlace de restablecimiento a su correo.' });
   try {
     var key = String(ident || '').trim().toLowerCase().slice(0, 100);
     if (!key || throttled_('fp_' + key)) return done;
@@ -286,12 +288,12 @@ function forgotPassword(ident) {
     var tok = Utilities.getUuid(), sh = resetsSheet_(), shop = settings_().shop_name || APP_NAME;
     withLock_(function(){ putText_(sh, sh.getLastRow() + 1, [[tok, String(r[U.NAME]), new Date(Date.now() + RESET_TTL).toISOString(), '', nowIso_()]]); });
     var url = ScriptApp.getService().getUrl() + '?reset=' + tok, nm = escHtml_(r[U.FULL] || r[U.NAME]);
-    MailApp.sendEmail({ to:String(r[U.EMAIL]), subject:shop + ' — password reset', htmlBody:
+    MailApp.sendEmail({ to:String(r[U.EMAIL]), subject:shop + ' — restablecimiento de contraseña', htmlBody:
       '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px">' +
-      '<h2 style="color:#001f3f">Password reset</h2><p>Hi ' + nm + ',</p><p>Click the button below to set a new password:</p>' +
-      '<p><a href="' + url + '" style="display:inline-block;padding:12px 24px;background:#001f3f;color:#fff;text-decoration:none;border-radius:4px;font-weight:600">Reset Password</a></p>' +
-      '<p style="color:#666;font-size:13px">This link works once and expires in 1 hour. If you did not ask for it, ignore this email.</p></div>' });
-    addLog_(r[U.NAME], 'PASSWORD_RESET_REQUEST', 'Reset link emailed');
+      '<h2 style="color:#001f3f">Restablecer contraseña</h2><p>Hola ' + nm + ',</p><p>Haz clic en el botón de abajo para establecer una nueva contraseña:</p>' +
+      '<p><a href="' + url + '" style="display:inline-block;padding:12px 24px;background:#001f3f;color:#fff;text-decoration:none;border-radius:4px;font-weight:600">Restablecer contraseña</a></p>' +
+      '<p style="color:#666;font-size:13px">Este enlace funciona una sola vez y vence en 1 hora. Si no solicitaste este cambio, puedes ignorar este correo.</p></div>' });
+    addLog_(r[U.NAME], 'SOLICITUD_RESTABLECER_PASS', 'Enlace de restablecimiento enviado por correo');
   } catch (e) { Logger.log('forgotPassword: ' + e); }
   return done;
 }
@@ -300,34 +302,34 @@ function forgotPassword(ident) {
 function resetPassword(token, pwd) {
   try {
     token = String(token || ''); pwd = String(pwd || '');
-    if (!TOKEN_RX.test(token)) return err_('This reset link is not valid');
-    if (pwd.length < 8) return err_('Password must be at least 8 characters');
+    if (!TOKEN_RX.test(token)) return err_('Este enlace de restablecimiento no es válido');
+    if (pwd.length < 8) return err_('La contraseña debe tener al menos 8 caracteres');
     return withLock_(function(){
       var sh = resetsSheet_(), rows = sh.getDataRange().getValues(), i = -1;
       for (var j = 1; j < rows.length; j++) if (rows[j][0] === token) { i = j; break; }
-      if (i === -1) return err_('This reset link is not valid');
-      if (rows[i][3]) return err_('This link was already used — request a new one');
-      if (new Date(rows[i][2]).getTime() < Date.now()) return err_('This link has expired — request a new one');
+      if (i === -1) return err_('Este enlace de restablecimiento no es válido');
+      if (rows[i][3]) return err_('Este enlace ya fue utilizado — solicita uno nuevo');
+      if (new Date(rows[i][2]).getTime() < Date.now()) return err_('Este enlace ha expirado — solicita uno nuevo');
       var name = String(rows[i][1]), u = userRows_(), k = uRow_(u, name);
-      if (k === -1) return err_('Account not found');
+      if (k === -1) return err_('Cuenta no encontrada');
       var r = u.data[k]; r[U.PWD] = pwd; r[U.UPDATED] = nowIso_(); r[U.UPDATED_BY] = 'reset';
       while (r.length < USER_HEAD.length) r.push('');
       putText_(u.sh, k + 1, [r]);
       var now = nowIso_(), used = rows.slice(1).map(function(x){ return [String(x[1]) === name && !x[3] ? now : x[3]]; });
       sh.getRange(2, 4, used.length, 1).setNumberFormat('@').setValues(used);
-      CACHE_.remove('lf_' + name.toLowerCase());                                          // clear any login lockout
-      addLog_(name, 'PASSWORD_RESET', 'Password changed from reset link');
-      return ok_({ message:'Password changed — you can sign in now.' });
+      CACHE_.remove('lf_' + name.toLowerCase());                                          // limpiar bloqueo de login
+      addLog_(name, 'PASS_RESTABLECIDA', 'Contraseña cambiada desde enlace de restablecimiento');
+      return ok_({ message:'Contraseña cambiada — ya puedes iniciar sesión.' });
     });
-  } catch (e) { return err_('Reset failed — please try again'); }
+  } catch (e) { return err_('Error al restablecer — por favor intenta de nuevo'); }
 }
 
 // ============== Users ==============
 // role must exist; only an owner (super role) may hand out or touch an owner account
 var isSuper_ = function(role){ return !!(roleByKey_(role) || {}).is_super; };
 function roleBad_(key, me) {
-  if (!roleByKey_(key)) return 'Unknown role: ' + key;
-  return isSuper_(key) && !isSuper_(me.role) ? 'Only an owner can assign the ' + key + ' role' : '';
+  if (!roleByKey_(key)) return 'Rol desconocido: ' + key;
+  return isSuper_(key) && !isSuper_(me.role) ? 'Solo un propietario puede asignar el rol ' + key : '';
 }
 var guarded_ = function(r, me){ return isSuper_(r[U.ROLE]) && !isSuper_(me.role); };   // non-owner vs owner account
 
@@ -339,18 +341,18 @@ function addUser(tok, d) {
   return api_(tok, 'users', 'a', function(me){
     d = d || {};
     var name = String(d.Username || '').trim(), role = d.Role || 'Customer', email = String(d.Email || '').trim();
-    if (!name || !d.Password) return err_('Username and password are required');
-    if (!EMAIL_RX.test(email)) return err_('Enter a valid email');
+    if (!name || !d.Password) return err_('El usuario y la contraseña son obligatorios');
+    if (!EMAIL_RX.test(email)) return err_('Ingresa un correo electrónico válido');
     var bad = roleBad_(role, me); if (bad) return err_(bad);
     return withLock_(function(){
       var u = userRows_();
-      if (uRow_(u, name) !== -1) return err_('Username already exists');
-      if (emailTaken_(u, email, name)) return err_('That email is already used by another account');
+      if (uRow_(u, name) !== -1) return err_('El nombre de usuario ya existe');
+      if (emailTaken_(u, email, name)) return err_('Ese correo ya está registrado en otra cuenta');
       var x = userExtra_(d, null), row = userRow_({ name:name, email:email, pwd:String(d.Password), role:role,
         status:d.Status === 'Inactive' ? 'Inactive' : 'Active', by:me.u, full:x.full, phone:x.phone, addr:x.addr });
       putText_(u.sh, u.data.length + 1, [row]);
-      ixPatch_(function(ix){ ix[name] = [row[U.ROLE], row[U.STATUS]]; }); addLog_(me.u, 'User Added', 'Added user: ' + name);
-      return ok_({ message:'User added successfully!', user:userOut_(row) });
+      ixPatch_(function(ix){ ix[name] = [row[U.ROLE], row[U.STATUS]]; }); addLog_(me.u, 'Usuario Agregado', 'Usuario agregado: ' + name);
+      return ok_({ message:'¡Usuario agregado exitosamente!', user:userOut_(row) });
     });
   });
 }
@@ -358,17 +360,17 @@ function addUser(tok, d) {
 // skip-and-collect: bad rows -> errors[], good rows still land; ONE setValues, ONE log
 function bulkImportUsers(tok, rows) {
   return api_(tok, 'users', 'a', function(me){
-    if (!rows || !rows.length) return err_('No rows to import');
+    if (!rows || !rows.length) return err_('No hay filas para importar');
     return withLock_(function(){
       var u = userRows_(), existing = {}, mails = {}, ts = nowIso_(), out = [], errors = [];
       Object.keys(u.ix).forEach(function(k){ existing[k.trim().toLowerCase()] = 1; });
       u.data.slice(1).forEach(function(r){ mails[String(r[U.EMAIL]).trim().toLowerCase()] = 1; });
       rows.forEach(function(r, i) {
-        var name = String(r.Username || '').trim(), key = name.toLowerCase(), mail = String(r.Email || '').trim(), role = roleByKey_(r.Role) ? r.Role : 'Customer', n = 'Row ' + (i + 1) + ': ';
-        if (!name)                                     return errors.push(n + 'missing Username');
-        if (!r.Password || !EMAIL_RX.test(mail))       return errors.push(n + 'missing Password or bad Email');
-        if (existing[key])                             return errors.push(n + 'duplicate ' + name);
-        if (mails[mail.toLowerCase()])                 return errors.push(n + 'email already used ' + mail);
+        var name = String(r.Username || '').trim(), key = name.toLowerCase(), mail = String(r.Email || '').trim(), role = roleByKey_(r.Role) ? r.Role : 'Customer', n = 'Fila ' + (i + 1) + ': ';
+        if (!name)                                     return errors.push(n + 'falta el nombre de usuario');
+        if (!r.Password || !EMAIL_RX.test(mail))       return errors.push(n + 'falta la contraseña o el correo no es válido');
+        if (existing[key])                             return errors.push(n + 'nombre de usuario duplicado: ' + name);
+        if (mails[mail.toLowerCase()])                 return errors.push(n + 'correo ya registrado: ' + mail);
         if (roleBad_(role, me))                        return errors.push(n + roleBad_(role, me));
         var x; try { x = userExtra_(r, null); } catch (e) { return errors.push(n + ((e && e.user) || e)); }
         existing[key] = 1; mails[mail.toLowerCase()] = 1;                              // dups inside the same csv
@@ -376,7 +378,7 @@ function bulkImportUsers(tok, rows) {
                             by:me.u, ts:ts, full:x.full, phone:x.phone, addr:x.addr }));
       });
       putText_(u.sh, u.data.length + 1, out);
-      ixPatch_(function(ix){ out.forEach(function(r){ ix[r[U.NAME]] = [r[U.ROLE], r[U.STATUS]]; }); }); addLog_(me.u, 'Bulk Import', 'Users: ' + out.length + ' imported, ' + errors.length + ' skipped');
+      ixPatch_(function(ix){ out.forEach(function(r){ ix[r[U.NAME]] = [r[U.ROLE], r[U.STATUS]]; }); }); addLog_(me.u, 'Importación Masiva', 'Usuarios: ' + out.length + ' importados, ' + errors.length + ' omitidos');
       return ok_({ count:out.length, errors:errors });
     });
   });
@@ -385,8 +387,8 @@ function bulkImportUsers(tok, rows) {
 // bulk status flip — one read, two column writes; skips self + owner accounts a non-owner can't touch
 function bulkSetStatus(tok, usernames, status) {
   return api_(tok, 'users', 'e', function(me){
-    if (!usernames || !usernames.length) return err_('No users selected');
-    if (status !== 'Active' && status !== 'Inactive') return err_('Invalid status');
+    if (!usernames || !usernames.length) return err_('No hay usuarios seleccionados');
+    if (status !== 'Active' && status !== 'Inactive') return err_('Estado no válido');
     return withLock_(function(){
       var u = userRows_(), d = u.data, want = {}, ts = nowIso_(), changed = [], skipped = 0;
       if (d.length < 2) return ok_({ count:0 });
@@ -401,7 +403,7 @@ function bulkSetStatus(tok, usernames, status) {
         u.sh.getRange(2, U.UPDATED + 1, d.length - 1, 2).setNumberFormat('@').setValues(d.slice(1).map(function(r){ return [r[U.UPDATED], r[U.UPDATED_BY]]; }));
         ixPatch_(function(ix){ changed.forEach(function(x){ if (ix[x]) ix[x][1] = status; }); });
       }
-      addLog_(me.u, 'Bulk Status', status + ': ' + changed.length + ' user(s)' + (skipped ? ', ' + skipped + ' skipped' : ''));
+      addLog_(me.u, 'Estado Masivo', status + ': ' + changed.length + ' usuario(s)' + (skipped ? ', ' + skipped + ' omitidos' : ''));
       return ok_({ count:changed.length, skipped:skipped, changed:changed });
     });
   });
@@ -410,7 +412,7 @@ function bulkSetStatus(tok, usernames, status) {
 // bulk delete — compact survivors up, then ONE block delete; never the caller, never an owner for a non-owner
 function bulkDeleteUsers(tok, usernames) {
   return api_(tok, 'users', 'd', function(me){
-    if (!usernames || !usernames.length) return err_('No users selected');
+    if (!usernames || !usernames.length) return err_('No hay usuarios seleccionados');
     return withLock_(function(){
       var u = userRows_(), want = {}, keep = [], gone = [], skipped = 0;
       usernames.forEach(function(x){ want[String(x)] = 1; });
@@ -425,7 +427,7 @@ function bulkDeleteUsers(tok, usernames) {
         u.sh.deleteRows(keep.length + 2, gone.length);
         ixPatch_(function(ix){ gone.forEach(function(x){ delete ix[x]; }); });
       }
-      addLog_(me.u, 'Bulk Delete', 'Users deleted: ' + gone.length + (skipped ? ' (' + skipped + ' skipped)' : ''));
+      addLog_(me.u, 'Eliminación Masiva', 'Usuarios eliminados: ' + gone.length + (skipped ? ' (' + skipped + ' omitidos)' : ''));
       return ok_({ count:gone.length, skipped:skipped, deleted:gone });
     });
   });
@@ -435,37 +437,37 @@ function updateUser(tok, username, d) {
   return api_(tok, 'users', 'e', function(me){
     d = d || {};
     var bad = roleBad_(d.Role, me); if (bad) return err_(bad);
-    if (d.Status !== 'Active' && d.Status !== 'Inactive') return err_('Invalid status');
+    if (d.Status !== 'Active' && d.Status !== 'Inactive') return err_('Estado no válido');
     var email = String(d.Email || '').trim();
-    if (!EMAIL_RX.test(email)) return err_('Enter a valid email');
-    if (username === me.u && (d.Role !== me.role || d.Status !== 'Active')) return err_('You cannot change your own role or status');
+    if (!EMAIL_RX.test(email)) return err_('Ingresa un correo electrónico válido');
+    if (username === me.u && (d.Role !== me.role || d.Status !== 'Active')) return err_('No puedes cambiar tu propio rol o estado');
     return withLock_(function(){
       var u = userRows_(), i = uRow_(u, username);
-      if (i === -1) return err_('User not found');
+      if (i === -1) return err_('Usuario no encontrado');
       var r = u.data[i];
-      if (guarded_(r, me)) return err_('Only an owner can edit an owner account');
-      if (emailTaken_(u, email, username)) return err_('That email is already used by another account');
+      if (guarded_(r, me)) return err_('Solo un propietario puede editar una cuenta de propietario');
+      if (emailTaken_(u, email, username)) return err_('Ese correo ya está registrado en otra cuenta');
       var x = userExtra_(d, r);
       r[U.EMAIL] = email; r[U.ROLE] = d.Role; r[U.STATUS] = d.Status;
       r[U.FULL] = x.full || username; r[U.PHONE] = x.phone; r[U.ADDR] = x.addr;
       if (d.Password && String(d.Password).trim()) r[U.PWD] = String(d.Password);
       saveRow_(u, i, r, me.u);
-      ixPatch_(function(ix){ ix[username] = [r[U.ROLE], r[U.STATUS]]; }); addLog_(me.u, 'User Updated', 'Updated user: ' + username);
-      return ok_({ message:'User updated successfully!', user:userOut_(r) });
+      ixPatch_(function(ix){ ix[username] = [r[U.ROLE], r[U.STATUS]]; }); addLog_(me.u, 'Usuario Actualizado', 'Usuario actualizado: ' + username);
+      return ok_({ message:'¡Usuario actualizado exitosamente!', user:userOut_(r) });
     });
   });
 }
 
 function deleteUser(tok, username) {
   return api_(tok, 'users', 'd', function(me){
-    if (username === me.u) return err_('You cannot delete your own account');
+    if (username === me.u) return err_('No puedes eliminar tu propia cuenta');
     return withLock_(function(){
       var u = userRows_(), i = uRow_(u, username);
-      if (i === -1) return err_('User not found');
-      if (guarded_(u.data[i], me)) return err_('Only an owner can delete an owner account');
+      if (i === -1) return err_('Usuario no encontrado');
+      if (guarded_(u.data[i], me)) return err_('Solo un propietario puede eliminar una cuenta de propietario');
       u.sh.deleteRow(i + 1);
-      ixPatch_(function(ix){ delete ix[username]; }); addLog_(me.u, 'User Deleted', 'Deleted user: ' + username);
-      return ok_({ message:'User deleted successfully!' });
+      ixPatch_(function(ix){ delete ix[username]; }); addLog_(me.u, 'Usuario Eliminado', 'Usuario eliminado: ' + username);
+      return ok_({ message:'¡Usuario eliminado exitosamente!' });
     });
   });
 }
@@ -475,18 +477,18 @@ function updateMyAccount(tok, f) {
   return api_(tok, null, null, function(me){
     f = f || {};
     var email = String(f.Email || '').trim();
-    if (!EMAIL_RX.test(email)) return err_('Enter a valid email');
-    if (f.NewPassword && String(f.NewPassword).length < 8) return err_('New password must be at least 8 characters');
+    if (!EMAIL_RX.test(email)) return err_('Ingresa un correo electrónico válido');
+    if (f.NewPassword && String(f.NewPassword).length < 8) return err_('La nueva contraseña debe tener al menos 8 caracteres');
     return withLock_(function(){
       var u = userRows_(), i = uRow_(u, me.u), r = u.data[i];
       if (i === -1) throw AUTH;                                         // deleted since the identity cache filled
-      if (String(f.CurrentPassword) !== String(r[U.PWD])) return err_('Current password is incorrect');
-      if (emailTaken_(u, email, me.u)) return err_('That email is already used by another account');
+      if (String(f.CurrentPassword) !== String(r[U.PWD])) return err_('La contraseña actual es incorrecta');
+      if (emailTaken_(u, email, me.u)) return err_('Ese correo ya está registrado en otra cuenta');
       r[U.EMAIL] = email;
       if (f.NewPassword && String(f.NewPassword).trim()) r[U.PWD] = String(f.NewPassword);
       saveRow_(u, i, r, me.u);
-      addLog_(me.u, 'Profile Updated', 'Updated own login details');
-      return ok_({ message:'Account updated successfully!' });
+      addLog_(me.u, 'Perfil Actualizado', 'Actualizó sus propios datos de acceso');
+      return ok_({ message:'¡Cuenta actualizada exitosamente!' });
     });
   });
 }
@@ -495,16 +497,16 @@ function updateMyAccount(tok, f) {
 function updateMyProfile(tok, f) {
   return api_(tok, null, null, function(me){
     f = f || {};
-    if (String(f.FullName || '').trim().length < 2) return err_('Enter your name');
-    if (!PHONE_RX.test(String(f.Phone || '').trim())) return err_('Phone: 7-20 digits (spaces and a leading + allowed)');
+    if (String(f.FullName || '').trim().length < 2) return err_('Ingresa tu nombre');
+    if (!PHONE_RX.test(String(f.Phone || '').trim())) return err_('Teléfono: 7-20 dígitos (se permiten espacios y un + al inicio)');
     return withLock_(function(){
       var u = userRows_(), i = uRow_(u, me.u), r = u.data[i];
       if (i === -1) throw AUTH;
       var x = userExtra_(f, r);
       r[U.FULL] = x.full; r[U.PHONE] = x.phone; r[U.ADDR] = x.addr;
       saveRow_(u, i, r, me.u);
-      addLog_(me.u, 'Profile Updated', 'Updated name / phone / address');
-      return ok_({ message:'Profile saved', profile:{ fullName:x.full, phone:x.phone, address:x.addr } });
+      addLog_(me.u, 'Perfil Actualizado', 'Nombre / teléfono / dirección actualizados');
+      return ok_({ message:'Perfil guardado', profile:{ fullName:x.full, phone:x.phone, address:x.addr } });
     });
   });
 }
@@ -528,7 +530,7 @@ function uploadProfileImage(tok, base64Data, filename) {
   return api_(tok, null, null, function(me){
     var img = saveImage_(base64Data, filename, me.u, getAssetsFolder_()), file = img.file, url = img.url;
     var st = patchMe_(me, function(r){ r[U.IMG] = url; });
-    addLog_(me.u, 'Profile Image Uploaded', 'Uploaded profile image: ' + file.getName());
+    addLog_(me.u, 'Foto de Perfil Subida', 'Foto de perfil subida: ' + file.getName());
     return ok_({ fileId:file.getId(), fileUrl:url, fileName:file.getName(), settings:st });
   });
 }
@@ -541,8 +543,8 @@ function updateUserSettings(tok, s) {
       if (s.themeMode === 'light' || s.themeMode === 'dark') r[U.THEME] = s.themeMode;
       if (s.customColors !== undefined) r[U.COLORS] = String(s.customColors).slice(0, 5000);
     });
-    addLog_(me.u, 'Settings Updated', 'Updated user settings');
-    return ok_({ message:'Settings updated successfully!', settings:st });
+    addLog_(me.u, 'Ajustes Actualizados', 'Ajustes de usuario actualizados');
+    return ok_({ message:'¡Ajustes actualizados exitosamente!', settings:st });
   });
 }
 
@@ -551,8 +553,8 @@ function setDefaultTheme(tok, themeId, varsJson) {
   return api_(tok, 'rbac', null, function(me){
     var id = themeIdSafe_(themeId);
     PropertiesService.getScriptProperties().setProperties({ DEFAULT_THEME_ID:id, DEFAULT_THEME_VARS:themeVarsSafe_(varsJson) });
-    addLog_(me.u, 'Default Theme Set', 'App default theme → ' + id);
-    return ok_({ message:'Default theme saved for all users!' });
+    addLog_(me.u, 'Tema Predeterminado Fijado', 'Tema predeterminado → ' + id);
+    return ok_({ message:'¡Tema predeterminado guardado para todos los usuarios!' });
   });
 }
 
@@ -611,19 +613,19 @@ function getRbacMatrix(tok) {
 // toggle one cell (v/a/e/d) — implied-view logic + owner-row lock
 function toggleRbac(tok, roleKey, pageKey, perm, value) {
   return api_(tok, 'rbac', null, function(me){
-    if (['v','a','e','d'].indexOf(perm) === -1) return err_('Bad permission');
-    if (!RBAC_PAGES.some(function(p){ return p.key === pageKey; })) return err_('Bad page');
+    if (['v','a','e','d'].indexOf(perm) === -1) return err_('Permiso no válido');
+    if (!RBAC_PAGES.some(function(p){ return p.key === pageKey; })) return err_('Página no válida');
     return withLock_(function(){
       var sh = ensureRbac_(), data = sh.getDataRange().getValues(), i = roleRowIx_(data, roleKey);
-      if (i === -1) return err_('Role not found');
-      if (Number(data[i][ROLE_C.SUPER]) === 1) return err_('Admin (owner) permissions are locked');
+      if (i === -1) return err_('Rol no encontrado');
+      if (Number(data[i][ROLE_C.SUPER]) === 1) return err_('Los permisos de Administrador (propietario) están bloqueados');
       var p = safeParse_(data[i][ROLE_C.PERMS], {}) || {}, c = p[pageKey] || (p[pageKey] = { v:0, a:0, e:0, d:0 }), on = value ? 1 : 0;
       c[perm] = on;
       if (perm === 'v' && !on) c.a = c.e = c.d = 0;                     // no view -> nothing else
       if (perm !== 'v' && on) c.v = 1;                                  // any grant implies view
       sh.getRange(i + 1, ROLE_C.PERMS + 1).setValue(JSON.stringify(p));
-      bustRoles_(); addLog_(me.u, 'Permissions Updated', roleKey + ' · ' + pageKey + ' · ' + perm + '=' + on);
-      return ok_({ message:'Saved' });
+      bustRoles_(); addLog_(me.u, 'Permisos Actualizados', roleKey + ' · ' + pageKey + ' · ' + perm + '=' + on);
+      return ok_({ message:'Guardado' });
     });
   });
 }
@@ -638,15 +640,15 @@ function addRole(tok, role) {
   return api_(tok, 'rbac', null, function(me){
     role = role || {};
     var key = String(role.key || '').trim();
-    if (!/^[A-Za-z0-9 _-]{2,30}$/.test(key)) return err_('Role key: 2-30 chars — letters, numbers, space, _ or - only');
+    if (!/^[A-Za-z0-9 _-]{2,30}$/.test(key)) return err_('Clave de rol: 2-30 caracteres — solo letras, números, espacios, _ o -');
     return withLock_(function(){
       var sh = ensureRbac_(), data = sh.getDataRange().getValues();
-      if (roleRowIx_(data, key) !== -1) return err_('That role already exists');
+      if (roleRowIx_(data, key) !== -1) return err_('Ese rol ya existe');
       var src = role.copyFrom ? roleByKey_(role.copyFrom) : null;                         // start from a template role, else deny-all
       sh.appendRow([key, String(role.label || key).trim().slice(0, 40), COLOR_RX.test(role.color) ? role.color : '#0074D9', data.length,
                     0, role.hidden_signup ? 1 : 0, JSON.stringify(src ? src.perms : rbacDefaultPerms_(key))]);   // is_super always 0 — owner is seeded only
-      bustRoles_(); addLog_(me.u, 'Role Added', key + (src ? ' (copied from ' + src.key + ')' : ''));
-      return ok_({ message:'Role added' });
+      bustRoles_(); addLog_(me.u, 'Rol Agregado', key + (src ? ' (copiado de ' + src.key + ')' : ''));
+      return ok_({ message:'Rol agregado' });
     });
   });
 }
@@ -657,14 +659,14 @@ function updateRole(tok, roleKey, role) {
     role = role || {};
     return withLock_(function(){
       var sh = ensureRbac_(), data = sh.getDataRange().getValues(), i = roleRowIx_(data, roleKey);
-      if (i === -1) return err_('Role not found');
+      if (i === -1) return err_('Rol no encontrado');
       var r = data[i];
       r[ROLE_C.LABEL] = String(role.label || roleKey).trim().slice(0, 40);
       r[ROLE_C.COLOR] = COLOR_RX.test(role.color) ? role.color : '#0074D9';
       r[ROLE_C.HIDDEN] = role.hidden_signup ? 1 : 0;
       sh.getRange(i + 1, ROLE_C.LABEL + 1, 1, ROLE_C.HIDDEN - ROLE_C.LABEL + 1).setValues([r.slice(ROLE_C.LABEL, ROLE_C.HIDDEN + 1)]);  // one write
-      bustRoles_(); addLog_(me.u, 'Role Updated', roleKey);
-      return ok_({ message:'Role updated' });
+      bustRoles_(); addLog_(me.u, 'Rol Actualizado', roleKey);
+      return ok_({ message:'Rol actualizado' });
     });
   });
 }
@@ -673,16 +675,16 @@ function updateRole(tok, roleKey, role) {
 function deleteRole(tok, roleKey) {
   return api_(tok, 'rbac', null, function(me){
     var r = roleByKey_(roleKey);
-    if (!r) return err_('Role not found');
-    if (r.is_super) return err_('The owner role cannot be deleted');
-    if (canEditRbac_(roleKey)) return err_('This role manages permissions and cannot be deleted');
+    if (!r) return err_('Rol no encontrado');
+    if (r.is_super) return err_('El rol de propietario no se puede eliminar');
+    if (canEditRbac_(roleKey)) return err_('Este rol administra permisos y no se puede eliminar');
     return withLock_(function(){
       var n = userRows_().data.filter(function(x){ return x[U.ROLE] === roleKey; }).length;
-      if (n) return err_(n + ' user(s) still have this role — reassign them first');
+      if (n) return err_(n + ' usuario(s) todavía tienen este rol — asígnales otro primero');
       var sh = ensureRbac_(), j = roleRowIx_(sh.getDataRange().getValues(), roleKey);
       if (j !== -1) sh.deleteRow(j + 1);
-      bustRoles_(); addLog_(me.u, 'Role Deleted', roleKey);
-      return ok_({ message:'Role deleted' });
+      bustRoles_(); addLog_(me.u, 'Rol Eliminado', roleKey);
+      return ok_({ message:'Rol eliminado' });
     });
   });
 }
@@ -691,17 +693,17 @@ function deleteRole(tok, roleKey) {
 var SET_KEY = 'settings_v1';
 var DEFAULT_HOURS = [0, 1, 2, 3, 4, 5, 6].map(function(d){ return { day:d, open:'11:00', close:'21:30', closed:0 }; });   // 0 = Sunday
 var SET_DEFAULTS = {
-  shop_name:'Demo Drinks', shop_logo:'', shop_address:'', shop_phone:'', shop_email:'', map_url:'', about_text:'',
-  hero_title:'Your drink, your way', hero_subtitle:'', hero_image:'',
-  currency_symbol:'$', currency_decimals:2,
+  shop_name:'Bebidas Demo', shop_logo:'', shop_address:'', shop_phone:'', shop_email:'', map_url:'', about_text:'',
+  hero_title:'Tu bebida, a tu gusto', hero_subtitle:'', hero_image:'',
+  currency_symbol:'$', currency_decimals:0,
   hours:JSON.stringify(DEFAULT_HOURS), always_open:0, ordering_enabled:1, pause_message:'', last_order_minutes:30, prep_minutes:15, slot_minutes:15,
   pickup_enabled:1, delivery_enabled:0, delivery_fee:0, delivery_note:'', min_order_amount:0,
-  sugar_levels:JSON.stringify(['Normal', 'Less', 'Half', 'Light', 'No sugar']), ice_levels:JSON.stringify(['Regular ice', 'Less ice', 'No ice', 'Hot']),
+  sugar_levels:JSON.stringify(['Normal', 'Menos', 'Mitad', 'Poca', 'Sin azúcar']), ice_levels:JSON.stringify(['Hielo normal', 'Poco hielo', 'Sin hielo', 'Caliente']),
   max_receipt_mb:5, reupload_max:3, notify_shop:0, notify_shop_email:'', notify_customer:0, notify_events:'shop.new_order,shop.reupload,shop.cust_cancel,customer.received,customer.approved,customer.rejected,customer.ready,customer.cancelled,customer.refunded,customer.welcome',
   footer_note:'', receipt_size:'80mm', date_format:'dd-MMM-yyyy', time_format:'hh:mm a', backup_keep_days:30,
   assets_folder_id:'', receipts_folder_id:'', backup_folder_id:''
 };
-var SET_JSON = { hours:DEFAULT_HOURS, sugar_levels:['Normal'], ice_levels:['Regular ice'] };   // stored as JSON text, read as arrays
+var SET_JSON = { hours:DEFAULT_HOURS, sugar_levels:['Normal'], ice_levels:['Hielo normal'] };   // stored as JSON text, read as arrays
 var DATE_FORMATS = ['dd-MMM-yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'], TIME_FORMATS = ['hh:mm a', 'HH:mm'];
 var HM_RX = /^([01]\d|2[0-3]):[0-5]\d$/;
 // the keys a shopper may see — never folder ids, notification emails or backup settings
@@ -744,21 +746,21 @@ var settingSet_ = function(k, v){ return withLock_(function(){ var s = JSON.pars
 // 7 day rows, HH:mm, close after open unless the day is closed
 function cleanHours_(v) {
   var a = Array.isArray(v) ? v : safeParse_(v, null);
-  if (!Array.isArray(a) || a.length !== 7) fail_('Opening hours need all 7 days');
+  if (!Array.isArray(a) || a.length !== 7) fail_('El horario de apertura requiere los 7 días');
   var seen = {};
   return a.map(function(h){
     var day = Number(h && h.day), closed = flag_(h.closed, 0), open = String(h.open || '').trim(), close = String(h.close || '').trim();
-    if (!(day >= 0 && day <= 6) || seen[day]) fail_('Opening hours: each day once'); seen[day] = 1;
-    if (!closed && (!HM_RX.test(open) || !HM_RX.test(close))) fail_('Opening hours must look like 11:00');
-    if (!closed && close <= open) fail_('Closing time must be after opening time');
+    if (!(day >= 0 && day <= 6) || seen[day]) fail_('Horario de apertura: cada día una sola vez'); seen[day] = 1;
+    if (!closed && (!HM_RX.test(open) || !HM_RX.test(close))) fail_('El horario debe tener el formato 11:00');
+    if (!closed && close <= open) fail_('La hora de cierre debe ser posterior a la de apertura');
     return { day:day, open:HM_RX.test(open) ? open : '11:00', close:HM_RX.test(close) ? close : '21:30', closed:closed };
   }).sort(function(x, y){ return x.day - y.day; });
 }
 // sugar / ice pick-lists: 1-8 unique labels, 1-20 chars
 function cleanLevels_(v, what) {
   var a = (Array.isArray(v) ? v : safeParse_(v, [])).map(function(x){ return String(x == null ? '' : x).trim().slice(0, 20); }).filter(Boolean), seen = {};
-  if (!a.length || a.length > 8) fail_(what + ': 1-8 choices');
-  a.forEach(function(x){ var k = x.toLowerCase(); if (seen[k]) fail_(what + ': "' + x + '" is listed twice'); seen[k] = 1; });
+  if (!a.length || a.length > 8) fail_(what + ': 1-8 opciones');
+  a.forEach(function(x){ var k = x.toLowerCase(); if (seen[k]) fail_(what + ': "' + x + '" está repetido'); seen[k] = 1; });
   return a;
 }
 var money_ = function(v, msg){ return num_(v, 0, 100000, msg, 2); };
@@ -768,45 +770,45 @@ function cleanSettings_(d, cur) {
   var s = {}, str = function(k, max){ return String(d[k] == null ? '' : d[k]).trim().slice(0, max); };
   var int = function(k, lo, hi, msg){ var n = Number(d[k]); if (d[k] === '' || d[k] == null || isNaN(n) || n < lo || n > hi || Math.round(n) !== n) fail_(msg); return n; };
   Object.keys(SET_DEFAULTS).forEach(function(k){ s[k] = cur[k]; });
-  s.shop_name = str('shop_name', 80);                 if (!s.shop_name) fail_('Shop name is required');
+  s.shop_name = str('shop_name', 80);                 if (!s.shop_name) fail_('El nombre de la tienda es obligatorio');
   s.shop_address = str('shop_address', 300);
-  s.shop_phone = str('shop_phone', 20);               if (s.shop_phone && !PHONE_RX.test(s.shop_phone)) fail_('Shop phone: 7-20 digits');
-  s.shop_email = str('shop_email', 100);              if (s.shop_email && !EMAIL_RX.test(s.shop_email)) fail_('Enter a valid shop email');
-  s.map_url = str('map_url', 255);                    if (s.map_url && !/^https:\/\/\S+$/.test(s.map_url)) fail_('Map link must start with https://');
+  s.shop_phone = str('shop_phone', 20);               if (s.shop_phone && !PHONE_RX.test(s.shop_phone)) fail_('Teléfono de la tienda: 7-20 dígitos');
+  s.shop_email = str('shop_email', 100);              if (s.shop_email && !EMAIL_RX.test(s.shop_email)) fail_('Ingresa un correo de tienda válido');
+  s.map_url = str('map_url', 255);                    if (s.map_url && !/^https:\/\/\S+$/.test(s.map_url)) fail_('El enlace de mapa debe comenzar con https://');
   s.about_text = str('about_text', 600);
-  s.hero_title = str('hero_title', 80);               if (!s.hero_title) fail_('Hero headline is required');
+  s.hero_title = str('hero_title', 80);               if (!s.hero_title) fail_('El título principal (Hero) es obligatorio');
   s.hero_subtitle = str('hero_subtitle', 160);
   if (d.shop_logo === '') s.shop_logo = '';           // cleared from the form; a new image only arrives via upload
   if (d.hero_image === '') s.hero_image = '';
-  s.currency_symbol = str('currency_symbol', 5);      if (!s.currency_symbol) fail_('Currency symbol is required');
-  s.currency_decimals = Number(d.currency_decimals) === 0 ? 0 : 2;
+  s.currency_symbol = str('currency_symbol', 5);      if (!s.currency_symbol) fail_('El símbolo de moneda es obligatorio');
+  s.currency_decimals = Number(d.currency_decimals) === 2 ? 2 : 0;
   s.hours = cleanHours_(d.hours);                     // kept even while always open — they come back when it is switched off
   s.always_open = flag_(d.always_open, 0);
   s.ordering_enabled = flag_(d.ordering_enabled, 1);
   s.pause_message = str('pause_message', 160);
-  s.last_order_minutes = int('last_order_minutes', 0, 240, 'Last-order cut-off: 0-240 minutes');
-  s.prep_minutes = int('prep_minutes', 1, 240, 'Prep time: 1-240 minutes');
+  s.last_order_minutes = int('last_order_minutes', 0, 240, 'Límite de último pedido: 0-240 minutos');
+  s.prep_minutes = int('prep_minutes', 1, 240, 'Tiempo de preparación: 1-240 minutos');
   s.slot_minutes = Number(d.slot_minutes) === 30 ? 30 : 15;
   s.pickup_enabled = flag_(d.pickup_enabled, 1); s.delivery_enabled = flag_(d.delivery_enabled, 0);
-  if (!s.pickup_enabled && !s.delivery_enabled) fail_('Switch on pickup, delivery or both');
-  s.delivery_fee = money_(d.delivery_fee, 'Delivery fee must be 0 or more');
+  if (!s.pickup_enabled && !s.delivery_enabled) fail_('Habilita recogida, entrega a domicilio o ambas');
+  s.delivery_fee = money_(d.delivery_fee, 'El costo de envío debe ser 0 o más');
   s.delivery_note = str('delivery_note', 160);
-  s.min_order_amount = money_(d.min_order_amount, 'Minimum order must be 0 or more');
-  s.sugar_levels = cleanLevels_(d.sugar_levels, 'Sugar levels');
-  s.ice_levels = cleanLevels_(d.ice_levels, 'Ice levels');
-  s.max_receipt_mb = int('max_receipt_mb', 1, 10, 'Receipt size limit: 1-10 MB');
-  s.reupload_max = int('reupload_max', 1, 5, 'Receipt attempts: 1-5');
+  s.min_order_amount = money_(d.min_order_amount, 'El pedido mínimo debe ser 0 o más');
+  s.sugar_levels = cleanLevels_(d.sugar_levels, 'Niveles de azúcar');
+  s.ice_levels = cleanLevels_(d.ice_levels, 'Niveles de hielo');
+  s.max_receipt_mb = int('max_receipt_mb', 1, 10, 'Límite de tamaño de comprobante: 1-10 MB');
+  s.reupload_max = int('reupload_max', 1, 5, 'Intentos de comprobante: 1-5');
   s.notify_shop = flag_(d.notify_shop, 0); s.notify_customer = flag_(d.notify_customer, 0);
   s.notify_shop_email = mailList_(str('notify_shop_email', 300));
-  if (s.notify_shop && !s.notify_shop_email) fail_('Enter the email that receives new-order alerts');
+  if (s.notify_shop && !s.notify_shop_email) fail_('Ingresa el correo que recibe las alertas de nuevos pedidos');
   s.notify_events = String(d.notify_events == null ? cur.notify_events : d.notify_events).split(',').map(function(x){ return x.trim(); })
     .filter(function(x, i, a){ return MAIL_EVENTS.indexOf(x) !== -1 && a.indexOf(x) === i; }).join(',');
   s.footer_note = str('footer_note', 200);
-  if (['80mm', '58mm'].indexOf(d.receipt_size) === -1) fail_('Receipt size must be 80mm or 58mm');
+  if (['80mm', '58mm'].indexOf(d.receipt_size) === -1) fail_('El tamaño del recibo debe ser 80mm o 58mm');
   s.receipt_size = d.receipt_size;
-  s.date_format = oneOf_(d.date_format, DATE_FORMATS, 'dd-MMM-yyyy', 'Pick a date format');
-  s.time_format = oneOf_(d.time_format, TIME_FORMATS, 'hh:mm a', 'Pick a time format');
-  s.backup_keep_days = int('backup_keep_days', 1, 365, 'Keep backups: 1-365 days');
+  s.date_format = oneOf_(d.date_format, DATE_FORMATS, 'dd-MMM-yyyy', 'Selecciona un formato de fecha');
+  s.time_format = oneOf_(d.time_format, TIME_FORMATS, 'hh:mm a', 'Selecciona un formato de hora');
+  s.backup_keep_days = int('backup_keep_days', 1, 365, 'Guardar respaldos: 1-365 días');
   return s;
 }
 // what the admin screens get: every key + image urls (settings hold ids)
@@ -823,8 +825,8 @@ function saveSettings(tok, d) {
     return withLock_(function(){
       var cur = settings_(), s = writeSettings_(cleanSettings_(d || {}, cur)),
           diff = Object.keys(SET_DEFAULTS).filter(function(k){ return JSON.stringify(cur[k]) !== JSON.stringify(s[k]); });
-      addLog_(me.u, 'SETTINGS_SAVED', diff.length ? 'Changed: ' + diff.join(', ') : 'No changes');
-      return ok_({ message:'Settings saved', settings:setOut_(s) });
+      addLog_(me.u, 'AJUSTES_GUARDADOS', diff.length ? 'Cambiado: ' + diff.join(', ') : 'Sin cambios');
+      return ok_({ message:'Ajustes guardados', settings:setOut_(s) });
     });
   });
 }
@@ -832,10 +834,10 @@ function saveSettings(tok, d) {
 // logo / hero banner -> ASSETS/Shop (link-viewable public assets); the setting keeps the file id
 function uploadShopImage(tok, which, base64Data, filename) {
   return api_(tok, 'settings', 'e', function(me){
-    if (['shop_logo', 'hero_image'].indexOf(which) === -1) return err_('Unknown image');
+    if (['shop_logo', 'hero_image'].indexOf(which) === -1) return err_('Imagen desconocida');
     var img = saveImage_(base64Data, filename, which, shopFolder_()), s = settingSet_(which, img.file.getId());
-    addLog_(me.u, 'SETTINGS_SAVED', (which === 'shop_logo' ? 'Shop logo' : 'Hero banner') + ' uploaded');
-    return ok_({ message:'Image uploaded', settings:setOut_(s) });
+    addLog_(me.u, 'AJUSTES_GUARDADOS', (which === 'shop_logo' ? 'Logo de tienda' : 'Banner principal') + ' subido');
+    return ok_({ message:'Imagen subida', settings:setOut_(s) });
   });
 }
 
@@ -843,8 +845,8 @@ function uploadShopImage(tok, which, base64Data, filename) {
 function setOrderingEnabled(tok, on) {
   return api_(tok, 'settings', 'e', function(me){
     var s = settingSet_('ordering_enabled', on ? 1 : 0);
-    addLog_(me.u, 'SETTINGS_SAVED', 'Online orders ' + (on ? 'resumed' : 'paused'));
-    return ok_({ message:on ? 'Online orders are open again' : 'Online orders paused', settings:setOut_(s) });
+    addLog_(me.u, 'AJUSTES_GUARDADOS', 'Pedidos en línea ' + (on ? 'reanudados' : 'pausados'));
+    return ok_({ message:on ? 'Los pedidos en línea están abiertos nuevamente' : 'Pedidos en línea pausados', settings:setOut_(s) });
   });
 }
 
@@ -862,7 +864,7 @@ var strip_ = function(r){ var o = JSON.parse(JSON.stringify(r)); delete o.delete
 var todayYmd_ = function(){ return ymd_(new Date()); };
 var addDays_ = function(day, n){ var d = new Date(day + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 // money in the settings' precision (0 or 2 decimals)
-var round_ = function(v){ var dp = Number(settings_().currency_decimals) === 0 ? 0 : 2, f = Math.pow(10, dp); return Math.round((Number(v) || 0) * f + 1e-9) / f; };
+var round_ = function(v){ var dp = Number(settings_().currency_decimals) === 2 ? 2 : 0, f = Math.pow(10, dp); return Math.round((Number(v) || 0) * f + 1e-9) / f; };
 
 // ============== JSON-row store (Date | Data) ==============
 // one row per day, that day's records as a JSON array; a full cell (45k chars) spills into another row of the same date.
@@ -987,8 +989,8 @@ function nextNo_(pfx, sheet, field) {
 // base64 image -> folder; Drive write stays outside any lock. The client already downscaled it to JPEG / PNG
 function saveImage_(base64Data, filename, prefix, folder) {
   var raw = String(base64Data || ''), b64 = raw.split(',').pop(), mime = (/^data:(image\/(jpeg|png|webp));/.exec(raw) || [])[1] || 'image/jpeg';
-  if (!b64) fail_('No image data');
-  if (b64.length > 4000000) fail_('Image too large — 3 MB max');                   // base64 ~4/3 of bytes
+  if (!b64) fail_('No hay datos de imagen');
+  if (b64.length > 4000000) fail_('Imagen demasiado grande — máx. 3 MB');                   // base64 ~4/3 of bytes
   filename = String(filename || 'image').replace(/[^\w.\-]/g, '_').slice(0, 60);   // never trust a client filename
   var file = (folder || getAssetsFolder_()).createFile(Utilities.newBlob(Utilities.base64Decode(b64), mime, filename))
     .setName(prefix + '_' + Date.now() + '_' + filename).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -1068,37 +1070,37 @@ var MAX_SIZES = 4, MAX_ADDON_PICK = 3;
 var yes_ = function(v, def){ return flag_(v, def); };
 
 function cleanCategory_(d, cur) {
-  var name = str_(d, 'name', 40); if (!name) fail_('Enter the category name');
+  var name = str_(d, 'name', 40); if (!name) fail_('Ingresa el nombre de la categoría');
   var icon = str_(d, 'icon', 40) || (cur && cur.icon) || 'fa-mug-hot';
   if (CAT_ICONS.indexOf(icon) === -1) icon = 'fa-mug-hot';
   return { name:name, icon:icon, tagline:str_(d, 'tagline', 60), sort_order:cur ? cur.sort_order : -1, is_active:yes_(d.is_active, 1) };
 }
 function cleanAddon_(d, cur) {
-  var name = str_(d, 'name', 40); if (!name) fail_('Enter the add-on name');
-  if (d.price === '' || d.price == null) fail_('Enter the add-on price (0 is allowed)');
-  return { name:name, price:money_(d.price, 'Add-on price must be 0 or more'), is_available:yes_(d.is_available, 1), sort_order:cur ? cur.sort_order : -1, is_active:yes_(d.is_active, 1) };
+  var name = str_(d, 'name', 40); if (!name) fail_('Ingresa el nombre del complemento');
+  if (d.price === '' || d.price == null) fail_('Ingresa el precio del complemento (se permite 0)');
+  return { name:name, price:money_(d.price, 'El precio del complemento debe ser 0 o más'), is_available:yes_(d.is_available, 1), sort_order:cur ? cur.sort_order : -1, is_active:yes_(d.is_active, 1) };
 }
 // sizes: [{name, price_delta}] from the form, or "Medium:0|Large:0.5" from a CSV cell
 function cleanSizes_(v) {
   var a = Array.isArray(v) ? v : String(v || '').split('|').map(function(x){ var p = x.split(':'); return { name:p[0], price_delta:p[1] }; });
   a = a.map(function(s){ return { name:String((s && s.name) || '').trim().slice(0, 20), price_delta:s && s.price_delta }; }).filter(function(s){ return s.name; });
-  if (a.length > MAX_SIZES) fail_('Up to ' + MAX_SIZES + ' sizes');
+  if (a.length > MAX_SIZES) fail_('Hasta ' + MAX_SIZES + ' tamaños');
   var seen = {};
-  return a.map(function(s){ var k = s.name.toLowerCase(); if (seen[k]) fail_('Size "' + s.name + '" is listed twice'); seen[k] = 1;
-    return { name:s.name, price_delta:num_(s.price_delta, 0, 100000, 'Size "' + s.name + '": the price change must be 0 or more', 2) }; });
+  return a.map(function(s){ var k = s.name.toLowerCase(); if (seen[k]) fail_('El tamaño "' + s.name + '" está repetido'); seen[k] = 1;
+    return { name:s.name, price_delta:num_(s.price_delta, 0, 100000, 'Tamaño "' + s.name + '": la diferencia de precio debe ser 0 o más', 2) }; });
 }
 // ctx = { cats: byId, catByName, addons: byId, addonByName } built once per save / import
 function cleanProduct_(d, cur, ctx) {
-  var name = str_(d, 'name', 60); if (!name) fail_('Enter the drink name');
+  var name = str_(d, 'name', 60); if (!name) fail_('Ingresa el nombre de la bebida');
   var cat = ctx.cats[Number(d.category_id)] || ctx.catByName[String(d.category || d.category_id || '').trim().toLowerCase()];
-  if (!cat) fail_('Pick a category');
-  if (!cat.is_active && !(cur && cur.category_id === cat.id)) fail_('Category "' + cat.name + '" is archived — pick another');
-  var base = num_(d.base_price, 0, 100000, 'Base price must be a number', 2); if (!(base > 0)) fail_('Base price must be more than 0');
-  var ids = Array.isArray(d.addon_ids) ? d.addon_ids : String(d.addons || '').split('|').map(function(x){ x = x.trim().toLowerCase(); var a = ctx.addonByName[x]; if (x && !a) fail_('Unknown add-on "' + x + '"'); return a ? a.id : 0; });
+  if (!cat) fail_('Selecciona una categoría');
+  if (!cat.is_active && !(cur && cur.category_id === cat.id)) fail_('La categoría "' + cat.name + '" está archivada — elige otra');
+  var base = num_(d.base_price, 0, 100000, 'El precio base debe ser un número', 2); if (!(base > 0)) fail_('El precio base debe ser mayor a 0');
+  var ids = Array.isArray(d.addon_ids) ? d.addon_ids : String(d.addons || '').split('|').map(function(x){ x = x.trim().toLowerCase(); var a = ctx.addonByName[x]; if (x && !a) fail_('Complemento desconocido "' + x + '"'); return a ? a.id : 0; });
   var seen = {}, addonIds = [];
-  ids.forEach(function(x){ var a = ctx.addons[Number(x)]; if (!Number(x)) return; if (!a) fail_('Unknown add-on #' + x);
+  ids.forEach(function(x){ var a = ctx.addons[Number(x)]; if (!Number(x)) return; if (!a) fail_('Complemento desconocido #' + x);
     if (!a.is_active) return; if (!seen[a.id]) { seen[a.id] = 1; addonIds.push(a.id); } });
-  var max = d.max_addons === '' || d.max_addons == null ? MAX_ADDON_PICK : int_(d.max_addons, 0, MAX_ADDON_PICK, 'Max add-ons must be 0 to ' + MAX_ADDON_PICK);
+  var max = d.max_addons === '' || d.max_addons == null ? MAX_ADDON_PICK : int_(d.max_addons, 0, MAX_ADDON_PICK, 'Máx. complementos debe ser de 0 a ' + MAX_ADDON_PICK);
   return { name:name, category_id:cat.id, description:str_(d, 'description', 200), base_price:base, sizes:cleanSizes_(d.sizes),
     has_sugar:yes_(d.has_sugar, 1), has_ice:yes_(d.has_ice, 1), addon_ids:addonIds, max_addons:Math.min(max, addonIds.length),
     is_featured:yes_(d.is_featured, 0), is_available:yes_(d.is_available, 1), image_id:cur ? cur.image_id || '' : '',
@@ -1113,17 +1115,17 @@ var menuCtx_ = function(){
 
 // category archive guard: active drinks still in it
 var catBusy_ = function(r){ var n = JDB.all(PROD_SHEET).filter(function(p){ return p.category_id === r.id && p.is_active; }).length;
-  return n ? r.name + ' still has ' + n + ' active drink' + (n === 1 ? '' : 's') + ' — move or archive them first' : ''; };
+  return n ? r.name + ' todavía tiene ' + n + ' bebida' + (n === 1 ? ' activa' : 's activas') + ' — muévelas o archívalas primero' : ''; };
 
 var MENU = {
-  category: { sheet:CAT_SHEET, page:'categories', label:'Category', clean:cleanCategory_, code:['cat_code', 'CAT-', 2], nm:function(r){ return r.name; },
-              uniq:[['name', 'A category named']], guard:function(r, op){ return op === 'off' ? catBusy_(r) : ''; }, log:'CATEGORY',
+  category: { sheet:CAT_SHEET, page:'categories', label:'Categoría', clean:cleanCategory_, code:['cat_code', 'CAT-', 2], nm:function(r){ return r.name; },
+              uniq:[['name', 'Ya existe una categoría llamada']], guard:function(r, op){ return op === 'off' ? catBusy_(r) : ''; }, log:'CATEGORIA',
               csv:[['Name', 'name'], ['Icon', 'icon'], ['Tagline', 'tagline'], ['Active', 'is_active']] },
-  addon:    { sheet:ADDON_SHEET, page:'addons', label:'Add-on', clean:cleanAddon_, code:['addon_code', 'ADD-', 2], nm:function(r){ return r.name; },
-              uniq:[['name', 'An add-on named']], guard:function(){ return ''; }, log:'ADDON',
+  addon:    { sheet:ADDON_SHEET, page:'addons', label:'Complemento', clean:cleanAddon_, code:['addon_code', 'ADD-', 2], nm:function(r){ return r.name; },
+              uniq:[['name', 'Ya existe un complemento llamado']], guard:function(){ return ''; }, log:'COMPLEMENTO',
               csv:[['Name', 'name'], ['Price', 'price'], ['Available', 'is_available'], ['Active', 'is_active']] },
-  product:  { sheet:PROD_SHEET, page:'products', label:'Drink', clean:cleanProduct_, code:['product_code', 'DRK-', 3], nm:function(r){ return r.name; },
-              uniq:[['name', 'A drink named']], guard:function(){ return ''; }, log:'PRODUCT', order:'category_id',
+  product:  { sheet:PROD_SHEET, page:'products', label:'Bebida', clean:cleanProduct_, code:['product_code', 'DRK-', 3], nm:function(r){ return r.name; },
+              uniq:[['name', 'Ya existe una bebida llamada']], guard:function(){ return ''; }, log:'PRODUCTO', order:'category_id',
               csv:[['Name', 'name'], ['Category', 'category'], ['Description', 'description'], ['Base Price', 'base_price'], ['Sizes', 'sizes'],
                    ['Sugar', 'has_sugar'], ['Ice', 'has_ice'], ['Add-ons', 'addons'], ['Max Add-ons', 'max_addons'], ['Featured', 'is_featured'],
                    ['Available', 'is_available'], ['Active', 'is_active']] }
@@ -1132,7 +1134,7 @@ var MENU = {
 function uniqCheck_(M, rec, id, pool) {
   M.uniq.forEach(function(u){
     var v = String(rec[u[0]] || '').toLowerCase();
-    if (v && rec.is_active && pool.some(function(x){ return x.id != id && x.is_active && String(x[u[0]] || '').toLowerCase() === v; })) fail_(u[1] + ' "' + rec[u[0]] + '" already exists');
+    if (v && rec.is_active && pool.some(function(x){ return x.id != id && x.is_active && String(x[u[0]] || '').toLowerCase() === v; })) fail_(u[1] + ' "' + rec[u[0]] + '"');
   });
 }
 // next running code (CAT-01, ADD-01, DRK-001) — max existing + 1, inside the lock, never reused
@@ -1185,7 +1187,7 @@ function saveMenu_(tok, key, d) {
     var img = M.img ? imageNew_(d, key) : '';                                // Drive write outside the lock
     return withLock_(function(){
       var pool = JDB.all(M.sheet), cur = id ? pool.filter(function(x){ return x.id == id; })[0] : null, ctx = menuCtx_();
-      if (id && !cur) fail_(M.label + ' not found');
+      if (id && !cur) fail_(M.label + ' no encontrado');
       var rec = M.clean(d, cur, ctx);
       if (cur && cur.is_active && !rec.is_active && M.guard(cur, 'off')) fail_(M.guard(cur, 'off'));
       if (M.img) {
@@ -1200,8 +1202,8 @@ function saveMenu_(tok, key, d) {
       var saved = id ? JDB.update(M.sheet, id, rec) : JDB.insert(M.sheet, rec, me.u);
       if (key === 'addon' && cur && cur.is_active && !saved.is_active) dropAddon_([saved.id]);
       bustFront_(); _m.usage = null;
-      addLog_(me.u, M.log + (id ? '_EDITED' : '_ADDED'), saved[M.code[0]] + ' · ' + M.nm(saved));
-      return ok_({ message:M.label + (id ? ' updated' : ' added'), row:menuOut_(key, saved, menuCtx_()) });
+      addLog_(me.u, M.log + (id ? '_EDITADO' : '_AGREGADO'), saved[M.code[0]] + ' · ' + M.nm(saved));
+      return ok_({ message:M.label + (id ? ' actualizado' : ' agregado'), row:menuOut_(key, saved, menuCtx_()) });
     });
   });
 }
@@ -1216,7 +1218,7 @@ function dropAddon_(ids) {
 function setMenuStatus_(tok, key, ids, on) {
   var M = MENU[key];
   return api_(tok, M.page, 'e', function(me){
-    if (!ids || !ids.length) return err_('Nothing selected');
+    if (!ids || !ids.length) return err_('Nada seleccionado');
     return withLock_(function(){
       var want = {}, go = [], skipped = [], pool = JDB.all(M.sheet);
       ids.forEach(function(x){ want[String(x)] = 1; });
@@ -1230,7 +1232,7 @@ function setMenuStatus_(tok, key, ids, on) {
       if (go.length) JDB.patchMany(M.sheet, go, { is_active:on ? 1 : 0 });
       var moved = key === 'addon' && !on && go.length ? dropAddon_(go) : 0;
       bustFront_(); _m.usage = null;
-      if (go.length) addLog_(me.u, M.log + (on ? '_RESTORED' : '_ARCHIVED'), M.label + ': ' + go.length + (moved ? ' · removed from ' + moved + ' drink(s)' : ''));
+      if (go.length) addLog_(me.u, M.log + (on ? '_RESTABLECIDO' : '_ARCHIVADO'), M.label + ': ' + go.length + (moved ? ' · removido de ' + moved + ' bebida(s)' : ''));
       return ok_({ count:go.length, ids:go, skipped:skipped.length, skippedNames:skipped, touched:moved });
     });
   });
@@ -1239,8 +1241,8 @@ function setMenuStatus_(tok, key, ids, on) {
 function importMenu_(tok, key, rows) {
   var M = MENU[key];
   return api_(tok, M.page, 'a', function(me){
-    if (!rows || !rows.length) return err_('No rows to import');
-    if (rows.length > 1000) return err_('Import at most 1000 rows at a time');
+    if (!rows || !rows.length) return err_('No hay filas para importar');
+    if (rows.length > 1000) return err_('Importa como máximo 1000 filas a la vez');
     return withLock_(function(){
       var pool = JDB.all(M.sheet), ctx = menuCtx_(), out = [], errors = [];
       rows.forEach(function(raw, i){
@@ -1252,11 +1254,11 @@ function importMenu_(tok, key, rows) {
           uniqCheck_(M, rec, 0, pool.concat(out));
           rec[M.code[0]] = nextCode_(M, pool.concat(out));
           out.push(rec);
-        } catch (e) { errors.push('Row ' + (i + 2) + ': ' + ((e && (e.user || e.message)) || e)); }
+        } catch (e) { errors.push('Fila ' + (i + 2) + ': ' + ((e && (e.user || e.message)) || e)); }
       });
       JDB.insertMany(M.sheet, out, me.u);
       bustFront_(); _m.usage = null;
-      addLog_(me.u, M.log + '_IMPORT', M.label + ' import: ' + out.length + ' added, ' + errors.length + ' skipped');
+      addLog_(me.u, M.log + '_IMPORTACION', 'Importación de ' + M.label.toLowerCase() + ': ' + out.length + ' agregados, ' + errors.length + ' omitidos');
       return ok_({ count:out.length, errors:errors });
     });
   });
@@ -1264,7 +1266,7 @@ function importMenu_(tok, key, rows) {
 // ONE admin payload for Products + Categories + Add-ons (and every admin picker)
 function getMenuAdmin(tok) {
   return api_(tok, null, null, function(me){
-    if (!['products', 'categories', 'addons'].some(function(p){ return hasPerm_(me.role, p, 'v'); })) return err_('Access denied');
+    if (!['products', 'categories', 'addons'].some(function(p){ return hasPerm_(me.role, p, 'v'); })) return err_('Acceso denegado');
     var ctx = menuCtx_(), byOrder = function(a, b){ return (a.sort_order || 0) - (b.sort_order || 0) || String(a.name).localeCompare(String(b.name)); };
     var list = function(key){ return JDB.all(MENU[key].sheet).sort(byOrder).map(function(r){ return menuOut_(key, r, ctx); }); };
     var cats = list('category'), catOrder = {}; cats.forEach(function(c, i){ catOrder[c.id] = i; });
@@ -1276,50 +1278,50 @@ function getMenuAdmin(tok) {
 // sold out / available · featured / not — many rows, one write
 function setMenuFlag(tok, key, ids, flag, on) {
   var M = MENU[key];
-  if (['product', 'addon'].indexOf(key) === -1 || ['is_available', 'is_featured'].indexOf(flag) === -1 || (flag === 'is_featured' && key !== 'product')) return api_(tok, 'products', 'e', function(){ return err_('Not allowed'); });   // gate first, then the argument check
+  if (['product', 'addon'].indexOf(key) === -1 || ['is_available', 'is_featured'].indexOf(flag) === -1 || (flag === 'is_featured' && key !== 'product')) return api_(tok, 'products', 'e', function(){ return err_('No permitido'); });   // gate first, then the argument check
   return api_(tok, M.page, 'e', function(me){
-    if (!ids || !ids.length) return err_('Nothing selected');
+    if (!ids || !ids.length) return err_('Nada seleccionado');
     return withLock_(function(){
       var patch = {}; patch[flag] = on ? 1 : 0;
       var hit = JDB.patchMany(M.sheet, ids, patch);
       bustFront_(); _m.usage = null;
-      addLog_(me.u, M.log + '_EDITED', M.label + ': ' + hit.length + ' → ' + (flag === 'is_available' ? (on ? 'available' : 'sold out') : (on ? 'featured' : 'not featured')));
-      return ok_({ count:hit.length, ids:hit.map(function(x){ return x.id; }), message:hit.length + ' ' + M.label.toLowerCase() + (hit.length === 1 ? '' : 's') + ' updated' });
+      addLog_(me.u, M.log + '_EDITADO', M.label + ': ' + hit.length + ' → ' + (flag === 'is_available' ? (on ? 'disponible' : 'agotado') : (on ? 'destacado' : 'no destacado')));
+      return ok_({ count:hit.length, ids:hit.map(function(x){ return x.id; }), message:hit.length + ' ' + M.label.toLowerCase() + (hit.length === 1 ? '' : 's') + ' actualizado(s)' });
     });
   });
 }
 // move many drinks to another category (they go last there)
 function moveProducts(tok, ids, catId) {
   return api_(tok, 'products', 'e', function(me){
-    if (!ids || !ids.length) return err_('Nothing selected');
+    if (!ids || !ids.length) return err_('Nada seleccionado');
     return withLock_(function(){
       var ctx = menuCtx_(), cat = ctx.cats[Number(catId)];
-      if (!cat || !cat.is_active) fail_('Pick an active category');
+      if (!cat || !cat.is_active) fail_('Selecciona una categoría activa');
       var pool = JDB.all(PROD_SHEET), n = nextOrder_(MENU.product, pool, { category_id:cat.id });
       var hit = JDB.mutate(PROD_SHEET, ids, function(p){ if (p.category_id === cat.id) return false; p.category_id = cat.id; p.sort_order = n++; });
       bustFront_(); _m.usage = null;
-      addLog_(me.u, 'PRODUCT_EDITED', hit.length + ' drink(s) moved to ' + cat.name);
-      return ok_({ count:hit.length, ids:hit.map(function(x){ return x.id; }), category_id:cat.id, category_name:cat.name, message:hit.length + ' moved to ' + cat.name });
+      addLog_(me.u, 'PRODUCTO_EDITADO', hit.length + ' bebida(s) movida(s) a ' + cat.name);
+      return ok_({ count:hit.length, ids:hit.map(function(x){ return x.id; }), category_id:cat.id, category_name:cat.name, message:hit.length + ' bebida(s) movida(s) a ' + cat.name });
     });
   });
 }
 // order: swap with the neighbour above / below (products within their category) -> every row's new order back
 function moveMenuItem(tok, key, id, dir) {
   var M = MENU[key];
-  if (!M) return api_(tok, 'products', 'e', function(){ return err_('Unknown list'); });
+  if (!M) return api_(tok, 'products', 'e', function(){ return err_('Lista desconocida'); });
   return api_(tok, M.page, 'e', function(me){
     return withLock_(function(){
       var all = JDB.all(M.sheet), me0 = all.filter(function(x){ return x.id == id; })[0];
-      if (!me0) fail_(M.label + ' not found');
+      if (!me0) fail_(M.label + ' no encontrado');
       var list = all.filter(function(x){ return !M.order || x[M.order] === me0[M.order]; })
         .sort(function(a, b){ return (a.sort_order || 0) - (b.sort_order || 0) || String(a.name).localeCompare(String(b.name)); });
       var i = list.indexOf(me0), j = i + (dir < 0 ? -1 : 1);
-      if (j < 0 || j >= list.length) return ok_({ message:'Already at the ' + (dir < 0 ? 'top' : 'bottom'), order:{} });
+      if (j < 0 || j >= list.length) return ok_({ message:'Ya está en el ' + (dir < 0 ? 'principio' : 'final'), order:{} });
       list.splice(j, 0, list.splice(i, 1)[0]);
       var want = {}; list.forEach(function(x, k){ want[x.id] = k + 1; });
       JDB.mutate(M.sheet, list.map(function(x){ return x.id; }), function(x){ if (x.sort_order === want[x.id]) return false; x.sort_order = want[x.id]; });
       bustFront_();
-      return ok_({ message:'Order saved', order:want });
+      return ok_({ message:'Orden guardado', order:want });
     });
   });
 }
@@ -1357,25 +1359,25 @@ var demoPhoto_ = function(id, w, h){ return 'https://images.unsplash.com/photo-'
 // demo menu — generic drink names, round prices; one drink archived, one drink + one add-on sold out
 function seedMenu_() {
   var at = function(n){ return daysAgo_(60 - n, '09:00'); };
-  jdbSeed_(CAT_SHEET, [['Milk Tea', 'fa-mug-hot', 'Creamy. Chewy. Made to order.'], ['Fruit Soda', 'fa-lemon', 'Bright, bubbly and ice cold.'], ['Fresh Juice', 'fa-glass-water', 'Squeezed fresh, never from a carton.'], ['Iced Tea', 'fa-leaf', 'Brewed daily, poured over ice.']]
+  jdbSeed_(CAT_SHEET, [['Té con Leche', 'fa-mug-hot', 'Cremoso. Delicioso. Hecho al momento.'], ['Soda de Frutas', 'fa-lemon', 'Fresca, burbujeante y bien fría.'], ['Jugo Natural', 'fa-glass-water', 'Recién exprimido, 100% natural.'], ['Té Helado', 'fa-leaf', 'Preparado a diario, servido con hielo.']]
     .map(function(c, i){ return { cat_code:'CAT-0' + (i + 1), name:c[0], icon:c[1], tagline:c[2], sort_order:i + 1, is_active:1, created:at(i) }; }), 'admin');
   // cols: name, price, available
-  jdbSeed_(ADDON_SHEET, [['Add milk', 1], ['Extra sweet', 1.5], ['Tapioca pearls', 0.8], ['Coconut jelly', 0.8, 0], ['Cheese foam', 1.2]]
+  jdbSeed_(ADDON_SHEET, [['Leche extra', 3000], ['Extra dulce', 1500], ['Perlas de tapioca', 2500], ['Jalea de coco', 2500, 0], ['Espuma de queso', 3500]]
     .map(function(a, i){ return { addon_code:'ADD-0' + (i + 1), name:a[0], price:a[1], is_available:a[2] === 0 ? 0 : 1, sort_order:i + 1, is_active:1, created:at(5) }; }), 'admin');
-  var ML = function(l){ return [{ name:'Medium', price_delta:0 }, { name:'Large', price_delta:l }]; };
+  var ML = function(l){ return [{ name:'Mediano', price_delta:0 }, { name:'Grande', price_delta:l }]; };
   // cols: name, category, base, sizes, sugar, ice, add-ons, max, featured, available, active, description, demo photo
   var P = [
-    ['Classic Milk Tea', 1, 3.5, ML(0.5), 1, 1, [1, 2, 3], 3, 1, 1, 1, 'Black tea with creamy milk.', '1558857563-b371033873b8'],
-    ['Taro Milk Tea', 1, 4, ML(0.5), 1, 1, [1, 2, 3, 5], 3, 1, 1, 1, 'Smooth taro with milk tea.', '1525803377221-4f6ccdaa5133'],
-    ['Brown Sugar Milk', 1, 4.5, ML(0.6), 0, 1, [3, 5], 2, 0, 1, 1, 'Fresh milk with brown sugar syrup.', '1572490122747-3968b75cc699'],
-    ['Lemon Soda', 2, 3, [], 1, 1, [2], 1, 1, 1, 1, 'Sparkling soda with fresh lemon.', '1621263764928-df1444c5e859'],
-    ['Mango Fizz', 2, 4, ML(0.8), 1, 1, [2, 4], 2, 0, 1, 1, 'Mango purée topped with soda.', '1546173159-315724a31696'],
-    ['Strawberry Soda', 2, 3.8, ML(0.8), 1, 1, [2, 4], 2, 0, 1, 1, 'Strawberry syrup, soda and ice.', '1497534446932-c925b458314e'],
-    ['Orange Juice', 3, 4.5, [], 0, 1, [], 0, 0, 0, 1, 'Freshly squeezed oranges.', '1600271886742-f049cd451bba'],
-    ['Watermelon Juice', 3, 4.2, [], 0, 1, [], 0, 0, 1, 1, 'Fresh watermelon, blended to order.', '1595981267035-7b04ca84a82d'],
-    ['Passion Fruit Green Tea', 4, 3.6, ML(0.5), 1, 1, [2, 3, 4], 3, 1, 1, 1, 'Green tea with passion fruit pulp.', '1609951651556-5334e2706168'],
-    ['Lemon Iced Tea', 4, 3.2, ML(0.5), 1, 1, [2], 1, 0, 1, 1, 'Black tea over ice with lemon.', '1556679343-c7306c1976bc'],
-    ['Peach Oolong', 4, 3.8, ML(0.5), 1, 1, [2], 1, 0, 1, 0, 'Seasonal — back next summer.', '1499638673689-79a0b5115d87']
+    ['Té con Leche Clásico', 1, 12000, ML(2500), 1, 1, [1, 2, 3], 3, 1, 1, 1, 'Té negro con leche cremosa.', '1558857563-b371033873b8'],
+    ['Té con Leche de Taro', 1, 14000, ML(2500), 1, 1, [1, 2, 3, 5], 3, 1, 1, 1, 'Té con leche y suave taro.', '1525803377221-4f6ccdaa5133'],
+    ['Leche con Azúcar Morena', 1, 15000, ML(3000), 0, 1, [3, 5], 2, 0, 1, 1, 'Leche fresca con sirope de azúcar morena.', '1572490122747-3968b75cc699'],
+    ['Soda de Limón', 2, 9000, [], 1, 1, [2], 1, 1, 1, 1, 'Soda con limón fresco.', '1621263764928-df1444c5e859'],
+    ['Fizz de Mango', 2, 13000, ML(2500), 1, 1, [2, 4], 2, 0, 1, 1, 'Puré de mango con soda.', '1546173159-315724a31696'],
+    ['Soda de Fresa', 2, 12000, ML(2500), 1, 1, [2, 4], 2, 0, 1, 1, 'Sirope de fresa, soda y hielo.', '1497534446932-c925b458314e'],
+    ['Jugo de Naranja', 3, 9000, [], 0, 1, [], 0, 0, 0, 1, 'Naranjas recién exprimidas.', '1600271886742-f049cd451bba'],
+    ['Jugo de Sandía', 3, 9000, [], 0, 1, [], 0, 0, 1, 1, 'Sandía fresca, licuada al momento.', '1595981267035-7b04ca84a82d'],
+    ['Té Verde de Maracuyá', 4, 11000, ML(2000), 1, 1, [2, 3, 4], 3, 1, 1, 1, 'Té verde con pulpa de maracuyá.', '1609951651556-5334e2706168'],
+    ['Té Helado con Limón', 4, 10000, ML(2000), 1, 1, [2], 1, 0, 1, 1, 'Té negro con hielo y limón.', '1556679343-c7306c1976bc'],
+    ['Oolong de Durazno', 4, 12000, ML(2000), 1, 1, [2], 1, 0, 1, 0, 'De temporada — regresa el próximo verano.', '1499638673689-79a0b5115d87']
   ], ord = {};
   jdbSeed_(PROD_SHEET, P.map(function(p, i){ ord[p[1]] = (ord[p[1]] || 0) + 1;
     return { product_code:'DRK-' + ('00' + (i + 1)).slice(-3), name:p[0], category_id:p[1], description:p[11], image_id:demoPhoto_(p[12], 640, 640), base_price:p[2], sizes:p[3],
@@ -1383,20 +1385,20 @@ function seedMenu_() {
   bustFront_();
 }
 
-// ============== Payment methods — QR image OR bank name + account name + account number ==============
+// ============== Métodos de pago — imagen QR O nombre del banco + titular + número de cuenta ==============
 var PM_ICONS = ['fa-qrcode', 'fa-building-columns', 'fa-wallet', 'fa-mobile-screen', 'fa-money-bill-transfer', 'fa-money-bill-wave', 'fa-credit-card'];
 function cleanPayMethod_(d, cur) {
-  var name = str_(d, 'name', 40); if (!name) fail_('Enter the payment method name');
+  var name = str_(d, 'name', 40); if (!name) fail_('Ingresa el nombre del método de pago');
   var icon = str_(d, 'icon', 40); if (PM_ICONS.indexOf(icon) === -1) icon = (cur && cur.icon) || 'fa-building-columns';
   var acct = str_(d, 'account_number', 40).replace(/\s+/g, '');
-  if (acct && !/^[0-9A-Za-z-]{4,40}$/.test(acct)) fail_('Account number: digits, letters and "-" only');
+  if (acct && !/^[0-9A-Za-z-]{4,40}$/.test(acct)) fail_('Número de cuenta: solo dígitos, letras y "-"');
   return { name:name, icon:icon, qr_image_id:cur ? cur.qr_image_id || '' : '', bank_name:str_(d, 'bank_name', 80), account_name:str_(d, 'account_name', 80),
            account_number:acct, instructions:str_(d, 'instructions', 200), sort_order:cur ? cur.sort_order : -1, is_active:yes_(d.is_active, 1) };
 }
 // the client's display rule: a method needs a QR image, or all three bank fields
-var payMethodOk_ = function(r){ if (!r.qr_image_id && !(r.bank_name && r.account_name && r.account_number)) fail_('Add a QR image, or fill all three bank fields (bank name, account name, account number)'); };
-MENU.paymethod = { sheet:PM_SHEET, page:'paymethods', label:'Payment method', clean:cleanPayMethod_, code:['pm_code', 'PM-', 2], nm:function(r){ return r.name; },
-  uniq:[['name', 'A payment method named']], guard:function(){ return ''; }, log:'PAYMETHOD', img:'qr_image_id', check:payMethodOk_,
+var payMethodOk_ = function(r){ if (!r.qr_image_id && !(r.bank_name && r.account_name && r.account_number)) fail_('Agrega una imagen QR o completa los tres campos bancarios (nombre del banco, titular de la cuenta, número de cuenta)'); };
+MENU.paymethod = { sheet:PM_SHEET, page:'paymethods', label:'Método de pago', clean:cleanPayMethod_, code:['pm_code', 'PM-', 2], nm:function(r){ return r.name; },
+  uniq:[['name', 'Ya existe un método de pago llamado']], guard:function(){ return ''; }, log:'METODO_PAGO', img:'qr_image_id', check:payMethodOk_,
   csv:[['Name', 'name'], ['Icon', 'icon'], ['Bank Name', 'bank_name'], ['Account Name', 'account_name'], ['Account Number', 'account_number'], ['Instructions', 'instructions'], ['Active', 'is_active']] };
 MENU.product.img = 'image_id';
 
@@ -1421,11 +1423,11 @@ function paymentsPublic_() {
   });
 }
 
-// ============== Orders — placeOrder (public), the order record, the payment index ==============
+// ============== Pedidos — placeOrder (público), registro de pedido, índice de pagos ==============
 var ORDER_ST = ['SUBMITTED', 'PAYMENT_REJECTED', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
 var OPEN_ST = { SUBMITTED:1, PAYMENT_REJECTED:1, CONFIRMED:1, PREPARING:1, READY:1 };
-var CUST_LABEL = { SUBMITTED:'Payment under review', PAYMENT_REJECTED:'Payment problem — please re-upload', CONFIRMED:'Order confirmed', PREPARING:'Being prepared',
-  READY:'Ready for pickup', COMPLETED:'Completed', CANCELLED:'Cancelled' };
+var CUST_LABEL = { SUBMITTED:'Pago en revisión', PAYMENT_REJECTED:'Problema con el pago — vuelve a subir el comprobante', CONFIRMED:'Pedido confirmado', PREPARING:'En preparación',
+  READY:'Listo para recoger', COMPLETED:'Completado', CANCELLED:'Cancelado' };
 var MAX_LINES = 30, QTY_MAX = 20;
 var RCP_TYPES = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/heic':'heic', 'image/heif':'heic', 'application/pdf':'pdf' };
 
@@ -1435,27 +1437,27 @@ var markOpenDay_ = function(day){ var a = openDays_(); if (a.indexOf(day) === -1
 
 // ONE server price rule — rebuilt from the cached public menu, never from the browser's numbers
 function buildLines_(items, F, s) {
-  if (!Array.isArray(items) || !items.length) fail_('Your cart is empty');
-  if (items.length > MAX_LINES) fail_('Up to ' + MAX_LINES + ' lines per order');
+  if (!Array.isArray(items) || !items.length) fail_('Tu carrito está vacío');
+  if (items.length > MAX_LINES) fail_('Hasta ' + MAX_LINES + ' líneas por pedido');
   var P = {}, A = {}, dp = Number(s.currency_decimals) === 0 ? 0 : 2, r = function(v){ var f = Math.pow(10, dp); return Math.round(v * f + 1e-9) / f; };
   F.products.forEach(function(p){ P[p.id] = p; }); F.addons.forEach(function(a){ A[a.id] = a; });
   var lines = items.map(function(it, i){
     it = it || {};
-    var p = P[Number(it.product_id)], n = 'Line ' + (i + 1) + ': ';
-    if (!p) fail_(n + 'a drink is no longer on the menu');
-    if (!p.is_available) fail_(n + p.name + ' is sold out');
-    var qty = Number(it.qty); if (!(qty >= 1 && qty <= QTY_MAX) || Math.round(qty) !== qty) fail_(n + 'quantity must be 1 to ' + QTY_MAX);
+    var p = P[Number(it.product_id)], n = 'Línea ' + (i + 1) + ': ';
+    if (!p) fail_(n + 'una bebida ya no está en el menú');
+    if (!p.is_available) fail_(n + p.name + ' está agotado');
+    var qty = Number(it.qty); if (!(qty >= 1 && qty <= QTY_MAX) || Math.round(qty) !== qty) fail_(n + 'la cantidad debe ser de 1 a ' + QTY_MAX);
     var sz = null;
-    if (p.sizes.length) { sz = p.sizes.filter(function(z){ return z.name === it.size; })[0]; if (!sz) fail_(n + 'pick a size for ' + p.name); }
+    if (p.sizes.length) { sz = p.sizes.filter(function(z){ return z.name === it.size; })[0]; if (!sz) fail_(n + 'elige un tamaño para ' + p.name); }
     var sugar = p.has_sugar ? String(it.sugar || '') : '', ice = p.has_ice ? String(it.ice || '') : '';
-    if (p.has_sugar && s.sugar_levels.indexOf(sugar) === -1) fail_(n + 'pick a sugar level for ' + p.name);
-    if (p.has_ice && s.ice_levels.indexOf(ice) === -1) fail_(n + 'pick an ice level for ' + p.name);
+    if (p.has_sugar && s.sugar_levels.indexOf(sugar) === -1) fail_(n + 'elige un nivel de azúcar para ' + p.name);
+    if (p.has_ice && s.ice_levels.indexOf(ice) === -1) fail_(n + 'elige un nivel de hielo para ' + p.name);
     var ids = Array.isArray(it.addon_ids) ? it.addon_ids.map(Number) : [], seen = {};
-    if (ids.length > p.max_addons) fail_(n + p.name + ' takes up to ' + p.max_addons + ' add-on' + (p.max_addons === 1 ? '' : 's'));
+    if (ids.length > p.max_addons) fail_(n + p.name + ' admite hasta ' + p.max_addons + ' complemento' + (p.max_addons === 1 ? '' : 's'));
     var ads = ids.map(function(id){ var a = A[id];
-      if (seen[id]) fail_(n + 'an add-on is listed twice'); seen[id] = 1;
-      if (!a || p.addon_ids.indexOf(id) === -1) fail_(n + 'an add-on is no longer offered on ' + p.name);
-      if (!a.is_available) fail_(n + a.name + ' is sold out');
+      if (seen[id]) fail_(n + 'un complemento está listado dos veces'); seen[id] = 1;
+      if (!a || p.addon_ids.indexOf(id) === -1) fail_(n + 'un complemento ya no se ofrece en ' + p.name);
+      if (!a.is_available) fail_(n + a.name + ' está agotado');
       return { addon_id:a.id, name:a.name, price:a.price }; });
     var addonsTotal = r(ads.reduce(function(t, a){ return t + a.price; }, 0)), unit = r(p.base_price + (sz ? sz.price_delta : 0) + addonsTotal);
     return { line_no:i + 1, product_id:p.id, product_name:p.name, size_name:sz ? sz.name : '', size_delta:sz ? sz.price_delta : 0, sugar:sugar, ice:ice,
@@ -1472,14 +1474,14 @@ function slots_(s, st) {
 }
 // receipt: type by the file's own header (magic bytes), size by the Settings limit
 function receiptBlob_(f, s) {
-  if (!f || !f.b64) fail_('Upload your payment receipt');
+  if (!f || !f.b64) fail_('Sube tu comprobante de pago');
   var raw = String(f.b64), b64 = raw.split(',').pop(), max = Number(s.max_receipt_mb) || 5;
-  if (b64.length * 0.75 > max * 1048576) fail_('The receipt is larger than ' + max + ' MB');
+  if (b64.length * 0.75 > max * 1048576) fail_('El comprobante es mayor a ' + max + ' MB');
   var bytes = Utilities.base64Decode(b64), h = function(i){ return bytes[i] & 255; }, str = function(a, z){ var o = ''; for (var i = a; i < z && i < bytes.length; i++) o += String.fromCharCode(h(i)); return o; };
-  if (!bytes || bytes.length < 12) fail_('That file is empty');
+  if (!bytes || bytes.length < 12) fail_('Ese archivo está vacío');
   var mime = h(0) === 0xFF && h(1) === 0xD8 && h(2) === 0xFF ? 'image/jpeg' : str(0, 8) === '\x89PNG\r\n\x1a\n' ? 'image/png' : str(0, 4) === 'RIFF' && str(8, 12) === 'WEBP' ? 'image/webp'
     : str(0, 4) === '%PDF' ? 'application/pdf' : str(4, 8) === 'ftyp' && /^(heic|heix|heif|mif1|msf1|hevc)$/.test(str(8, 12)) ? 'image/heic' : '';
-  if (!mime) fail_('The receipt must be a photo (JPG, PNG, WEBP, HEIC) or a PDF');
+  if (!mime) fail_('El comprobante debe ser una foto (JPG, PNG, WEBP, HEIC) o un PDF');
   var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes).map(function(b){ return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
   return { bytes:bytes, mime:mime, ext:RCP_TYPES[mime], hash:hash, kb:Math.round(bytes.length / 1024) };
 }
@@ -1502,12 +1504,12 @@ function payIx_() {
 }
 var payIxAdd_ = function(hash, txn, no){ var ix = payIx_(); if (hash) ix.h[hash] = no; if (txn) ix.t[txn] = no; cachePut_(PAYIX_KEY, ix, CACHE_TTL); };
 var dupOf_ = function(map, key, no){ var o = key ? map[key] : ''; return o && o !== no ? o : ''; };
-var cleanTxn_ = function(v){ var t = String(v == null ? '' : v).trim().toUpperCase().replace(/\s+/g, ''); if (t && !/^[0-9A-Z._\/-]{4,40}$/.test(t)) fail_('Transaction ID: 4-40 letters or digits'); return t; };
+var cleanTxn_ = function(v){ var t = String(v == null ? '' : v).trim().toUpperCase().replace(/\s+/g, ''); if (t && !/^[0-9A-Z._\/-]{4,40}$/.test(t)) fail_('ID de transacción: 4-40 letras o dígitos'); return t; };
 
 // what a shopper sees about their own order — no usernames, no Drive ids, no admin note
 function orderPublic_(o, withToken) {
   var s = settings_(), tries = Number(s.reupload_max) || 3;
-  return { order_no:o.order_no, short_no:o.short_no, placed_at:o.placed_at, status:o.status, status_label:o.status === 'READY' && o.fulfilment === 'DELIVERY' ? 'Out for delivery' : CUST_LABEL[o.status],
+  return { order_no:o.order_no, short_no:o.short_no, placed_at:o.placed_at, status:o.status, status_label:o.status === 'READY' && o.fulfilment === 'DELIVERY' ? 'En camino para entrega' : CUST_LABEL[o.status],
     customer_name:o.customer_name, customer_phone:o.customer_phone, fulfilment:o.fulfilment, delivery_address:o.delivery_address, pickup_mode:o.pickup_mode, pickup_at:o.pickup_at,
     order_note:o.order_note, items:o.items, item_count:o.item_count, subtotal:o.subtotal, delivery_fee:o.delivery_fee, grand_total:o.grand_total,
     payment:{ name:o.payment_snapshot.name, txn_ref:o.txn_ref, attempt:o.payment_attempt, attempts_left:Math.max(0, tries - o.payment_attempt) }, reject_reason:o.reject_reason || '',
@@ -1523,39 +1525,39 @@ var phoneKey_ = function(p){ return String(p || '').replace(/\D/g, ''); };
 function placeOrder(tok, d) {
   return pub_(function(){
     d = d || {};
-    if (d.hp) fail_('Could not place the order');                                   // honeypot: a person never fills it
-    var cref = String(d.client_ref || ''); if (!CREF_RX.test(cref)) fail_('Please refresh the page and try again');
+    if (d.hp) fail_('No se pudo realizar el pedido');                                   // honeypot: a person never fills it
+    var cref = String(d.client_ref || ''); if (!CREF_RX.test(cref)) fail_('Por favor, actualiza la página e intenta de nuevo');
     var done = CACHE_.get('cref_' + cref);                                            // idempotent: a retry gets the order it already made
     if (done) { var o0 = findOrder_(done); if (o0) return ok_({ order:orderPublic_(o0, true), repeat:1 }); }
     var me = whoMaybe_(tok), s = settings_(), st = openState_(s);
-    if (!st.open) fail_(st.reason === 'paused' ? 'Online orders are paused right now — please try again soon' : 'Online orders are closed right now');
+    if (!st.open) fail_(st.reason === 'paused' ? 'Los pedidos en línea están pausados en este momento — por favor intenta pronto' : 'Los pedidos en línea están cerrados en este momento');
     var F = front_(), b = buildLines_(d.items, F, s);
     // customer
     var acct = null;
     if (me) { var u = userRows_(), ui = uRow_(u, me.u); acct = ui === -1 ? null : u.data[ui]; }
     var name = str_(d, 'name', 80), phone = str_(d, 'phone', 20), email = acct ? String(acct[U.EMAIL]) : str_(d, 'email', 100).toLowerCase();
-    if (name.length < 2) fail_('Enter your name');
-    if (!PHONE_RX.test(phone)) fail_('Enter a valid phone number');
-    if (email && !EMAIL_RX.test(email)) fail_('Enter a valid email or leave it empty');
+    if (name.length < 2) fail_('Ingresa tu nombre');
+    if (!PHONE_RX.test(phone)) fail_('Ingresa un número de teléfono válido');
+    if (email && !EMAIL_RX.test(email)) fail_('Ingresa un correo electrónico válido o déjalo vacío');
     // fulfilment + time
     var ful = String(d.fulfilment || 'PICKUP').toUpperCase();
-    if (ful !== 'PICKUP' && ful !== 'DELIVERY') fail_('Pick pickup or delivery');
-    if (ful === 'PICKUP' && !Number(s.pickup_enabled)) fail_('Pickup is not available');
-    if (ful === 'DELIVERY' && !Number(s.delivery_enabled)) fail_('Delivery is not available');
-    var addr = str_(d, 'delivery_address', 300); if (ful === 'DELIVERY' && addr.length < 5) fail_('Enter the delivery address');
+    if (ful !== 'PICKUP' && ful !== 'DELIVERY') fail_('Elige retiro o entrega');
+    if (ful === 'PICKUP' && !Number(s.pickup_enabled)) fail_('El retiro en tienda no está disponible');
+    if (ful === 'DELIVERY' && !Number(s.delivery_enabled)) fail_('La entrega a domicilio no está disponible');
+    var addr = str_(d, 'delivery_address', 300); if (ful === 'DELIVERY' && addr.length < 5) fail_('Ingresa la dirección de entrega');
     var mode = d.pickup_mode === 'SCHEDULED' ? 'SCHEDULED' : 'ASAP', at = '';
-    if (mode === 'SCHEDULED') { var hm = String(d.pickup_time || ''); if (slots_(s, st).indexOf(hm) === -1) fail_('That time is no longer available — pick another'); at = st.today.date + 'T' + hm; }
+    if (mode === 'SCHEDULED') { var hm = String(d.pickup_time || ''); if (slots_(s, st).indexOf(hm) === -1) fail_('Ese horario ya no está disponible — elige otro'); at = st.today.date + 'T' + hm; }
     // money: the server's total wins; a changed price stops the order before anything is stored
     var fee = ful === 'DELIVERY' ? round_(s.delivery_fee) : 0, total = round_(b.subtotal + fee);
-    if (Number(s.min_order_amount) && b.subtotal < Number(s.min_order_amount)) fail_('The minimum order is ' + s.currency_symbol + round_(s.min_order_amount));
-    if (d.expect_total != null && Math.abs(Number(d.expect_total) - total) > 0.001) return { success:false, code:'PRICES', message:'Prices were updated — please review your order', total:total };
+    if (Number(s.min_order_amount) && b.subtotal < Number(s.min_order_amount)) fail_('El pedido mínimo es ' + s.currency_symbol + round_(s.min_order_amount));
+    if (d.expect_total != null && Math.abs(Number(d.expect_total) - total) > 0.001) return { success:false, code:'PRICES', message:'Los precios fueron actualizados — por favor revisa tu pedido', total:total };
     // payment
     var pm = jdbList_(PM_SHEET).filter(function(m){ return m.id === Number(d.payment_method_id) && m.is_active; })[0];
-    if (!pm) fail_('Pick a payment method');
+    if (!pm) fail_('Elige un método de pago');
     var txn = cleanTxn_(d.txn_ref), rb = receiptBlob_(d.receipt, s);
     // abuse limits (per phone + the whole shop) — only counted for orders that got this far
-    if (throttled_('op_' + phoneKey_(phone), 3, 600)) fail_('Too many orders from this phone number — please wait a few minutes');
-    if (throttled_('op_all', 60, 600)) fail_('We are very busy — please try again in a few minutes');
+    if (throttled_('op_' + phoneKey_(phone), 3, 600)) fail_('Demasiados pedidos desde este número de teléfono — por favor espera unos minutos');
+    if (throttled_('op_all', 60, 600)) fail_('Estamos muy ocupados — por favor intenta de nuevo en unos minutos');
     var file = storeReceipt_(rb, 'receipt_' + cref);                                 // Drive write outside the lock
     var order = withLock_(function(){
       var again = CACHE_.get('cref_' + cref); if (again) { var o1 = findOrder_(again); if (o1) return o1; }
@@ -1568,14 +1570,14 @@ function placeOrder(tok, d) {
         payment_history:[{ n:1, file_id:file.getId(), hash:rb.hash, mime:rb.mime, txn_ref:txn, at:now, result:'', reason:'', by:who }],
         dup_receipt_order:dupOf_(ix.h, rb.hash, no), dup_txn_order:dupOf_(ix.t, txn, no), status:'SUBMITTED', verified_by:'', paid_at:'', reject_reason:'', eta_at:'',
         prep_started_at:'', ready_at:'', completed_at:'', cancelled_at:'', cancelled_by:'', cancel_reason:'', refund_status:'NONE', refund_note:'', admin_note:'',
-        timeline:[{ at:now, by:who, action:'Order placed', from:'', to:'SUBMITTED', note:pm.name + (txn ? ' · ' + txn : '') }] };
+        timeline:[{ at:now, by:who, action:'Pedido realizado', from:'', to:'SUBMITTED', note:pm.name + (txn ? ' · ' + txn : '') }] };
       var saved = JDB.insert(ORDER_SHEET, rec, who);
       payIxAdd_(rb.hash, txn, no); markOpenDay_(ymd_(now));
       CACHE_.put('cref_' + cref, no, 86400);
       return saved;
     });
     try { file.setName(order.order_no + '_1.' + rb.ext); } catch (e) {}
-    addLog_(me ? me.u : 'guest:' + phoneKey_(phone).slice(-4), 'ORDER_PLACED', order.order_no + ' · ' + s.currency_symbol + order.grand_total + ' · ' + pm.name + (order.dup_receipt_order || order.dup_txn_order ? ' · FLAGGED' : ''));
+    addLog_(me ? me.u : 'guest:' + phoneKey_(phone).slice(-4), 'PEDIDO_REALIZADO', order.order_no + ' · ' + s.currency_symbol + order.grand_total + ' · ' + pm.name + (order.dup_receipt_order || order.dup_txn_order ? ' · MARCADO' : ''));
     notifyShop_(order, s);
     notifyCustomer_(order, 'received', s);
     return ok_({ order:orderPublic_(order, true) });
@@ -1593,32 +1595,32 @@ var DEMO_QR_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAOgAAADoCAAAAADAwvekAAAB4UlEQVR42u3by
 function seedPayments_() {
   var qr = shopFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(DEMO_QR_B64), 'image/png', 'demo_qr.png')).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW).getId();
   jdbSeed_(PM_SHEET, [
-    { pm_code:'PM-01', name:'Wallet QR', icon:'fa-qrcode', qr_image_id:qr, bank_name:'', account_name:'', account_number:'', instructions:'Scan with your wallet app, then upload the payment screenshot.', sort_order:1, is_active:1, created:daysAgo_(40, '09:00') },
-    { pm_code:'PM-02', name:'Bank Transfer', icon:'fa-building-columns', qr_image_id:'', bank_name:'Demo Bank', account_name:'Demo Drinks', account_number:'012345678901', instructions:'Put your order number in the transfer note.', sort_order:2, is_active:1, created:daysAgo_(40, '09:05') },
-    { pm_code:'PM-03', name:'Old Bank Account', icon:'fa-building-columns', qr_image_id:'', bank_name:'Demo Bank 2', account_name:'Demo Drinks', account_number:'998877665544', instructions:'', sort_order:3, is_active:0, created:daysAgo_(40, '09:10') }
+    { pm_code:'PM-01', name:'Billetera QR (Nequi / Daviplata)', icon:'fa-qrcode', qr_image_id:qr, bank_name:'', account_name:'', account_number:'', instructions:'Escanea el código QR desde tu app de Nequi o Daviplata y adjunta el comprobante.', sort_order:1, is_active:1, created:daysAgo_(40, '09:00') },
+    { pm_code:'PM-02', name:'Transferencia Bancolombia', icon:'fa-building-columns', qr_image_id:'', bank_name:'Bancolombia', account_name:'Bebidas Demo SAS', account_number:'10234567890', instructions:'Cuenta de Ahorros. Coloca tu número de pedido en la descripción de la transferencia.', sort_order:2, is_active:1, created:daysAgo_(40, '09:05') },
+    { pm_code:'PM-03', name:'Cuenta Davivienda', icon:'fa-building-columns', qr_image_id:'', bank_name:'Davivienda', account_name:'Bebidas Demo SAS', account_number:'009988776655', instructions:'', sort_order:3, is_active:0, created:daysAgo_(40, '09:10') }
   ], 'admin');
   bustFront_();
 }
 
-// ============== Tracking (public) · re-upload · customer cancel · My Orders ==============
+// ============== Seguimiento (público) · volver a subir comprobante · cancelar cliente · Mis Pedidos ==============
 // the order a caller may see: a live token, or order no + the exact phone, or (signed in) their own order
 function ownOrder_(tok, q) {
   q = q || {};
   var me = whoMaybe_(tok), o = null, t = String(q.token || '').trim();
   if (t) {
-    if (!/^\d{8}[0-9a-f]{24}$/.test(t)) fail_('Order not found');
-    if (throttled_('tr_' + t.slice(8, 16), 20, 60)) fail_('Too many look-ups — wait a minute');
+    if (!/^\d{8}[0-9a-f]{24}$/.test(t)) fail_('Pedido no encontrado');
+    if (throttled_('tr_' + t.slice(8, 16), 20, 60)) fail_('Demasiadas consultas — espera un minuto');
     var day = t.slice(0, 4) + '-' + t.slice(4, 6) + '-' + t.slice(6, 8);
     o = sh_(ORDER_SHEET) ? JDB.between(ORDER_SHEET, day, day).filter(function(x){ return x.track_token === t; })[0] : null;
   } else {
     var no = String(q.order_no || '').trim().toUpperCase(), ph = phoneKey_(q.phone);
-    if (!no) fail_('Enter your order number');
-    if (!me && ph.length < 7) fail_('Enter the phone number used on the order');
-    if (throttled_('tr_' + (ph || me.u), 5, 60)) fail_('Too many look-ups — wait a minute');
+    if (!no) fail_('Ingresa tu número de pedido');
+    if (!me && ph.length < 7) fail_('Ingresa el número de teléfono utilizado en el pedido');
+    if (throttled_('tr_' + (ph || me.u), 5, 60)) fail_('Demasiadas consultas — espera un minuto');
     o = findOrder_(no);
     if (o && !(ph && phoneKey_(o.customer_phone) === ph) && !(me && o.customer_username === me.u)) o = null;   // same answer either way
   }
-  if (!o) fail_('Order not found — check the order number and phone');
+  if (!o) fail_('Pedido no encontrado — verifica el número de pedido y teléfono');
   return o;
 }
 // order no alone = progress only (numbers are guessable); token, phone or the customer's own account = the full order
@@ -1627,11 +1629,11 @@ function trackOrder(tok, q) {
     q = q || {};
     if (q.token || String(q.phone || '').trim()) return ok_({ order:orderPublic_(ownOrder_(tok, q), true) });
     var me = whoMaybe_(tok), no = String(q.order_no || '').trim().toUpperCase();
-    if (!no) fail_('Enter your order number');
-    if (!/^ORD-\d{8}-\d{4,6}$/.test(no)) fail_('Order not found — check the order number');
-    if (throttled_('trn_' + no, 20, 60) || throttled_('trn_all', 120, 60)) fail_('Too many look-ups — wait a minute');
+    if (!no) fail_('Ingresa tu número de pedido');
+    if (!/^ORD-\d{8}-\d{4,6}$/.test(no)) fail_('Pedido no encontrado — verifica el número de pedido');
+    if (throttled_('trn_' + no, 20, 60) || throttled_('trn_all', 120, 60)) fail_('Demasiadas consultas — espera un minuto');
     var o = findOrder_(no);
-    if (!o) fail_('Order not found — check the order number');
+    if (!o) fail_('Pedido no encontrado — verifica el número de pedido');
     return ok_({ order:me && o.customer_username === me.u ? orderPublic_(o, true) : orderStatus_(o) });
   });
 }
@@ -1657,8 +1659,8 @@ function myReceiptThumb(tok, q) {
 function reuploadReceipt(tok, q, receipt, txnRef) {
   return pub_(function(){
     var o = ownOrder_(tok, q), s = settings_(), max = Number(s.reupload_max) || 3;
-    if (o.status !== 'PAYMENT_REJECTED') fail_('This order is not waiting for a new receipt');
-    if (o.payment_attempt >= max) fail_('No receipt attempts left — please contact the shop');
+    if (o.status !== 'PAYMENT_REJECTED') fail_('Este pedido no está esperando un nuevo comprobante');
+    if (o.payment_attempt >= max) fail_('No quedan intentos de comprobante — por favor contacta a la tienda');
     var txn = cleanTxn_(txnRef), rb = receiptBlob_(receipt, s), n = o.payment_attempt + 1, who = (whoMaybe_(tok) || {}).u || 'guest';
     var file = storeReceipt_(rb, o.order_no + '_' + n);
     var saved = withLock_(function(){
@@ -1669,34 +1671,34 @@ function reuploadReceipt(tok, q, receipt, txnRef) {
         x.payment_history = (x.payment_history || []).concat({ n:n, file_id:file.getId(), hash:rb.hash, mime:rb.mime, txn_ref:txn, at:now, result:'', reason:'', by:who });
         x.dup_receipt_order = dupOf_(ix.h, rb.hash, x.order_no); x.dup_txn_order = dupOf_(ix.t, txn, x.order_no);
         x.status = 'SUBMITTED'; x.reject_reason = '';
-        x.timeline = (x.timeline || []).concat({ at:now, by:who, action:'Receipt re-uploaded', from:'PAYMENT_REJECTED', to:'SUBMITTED', note:'attempt ' + n + (txn ? ' · ' + txn : '') });
+        x.timeline = (x.timeline || []).concat({ at:now, by:who, action:'Comprobante vuelto a subir', from:'PAYMENT_REJECTED', to:'SUBMITTED', note:'intento ' + n + (txn ? ' · ' + txn : '') });
       }, ymd_(o.placed_at), ymd_(o.placed_at))[0];
-      if (!hit) fail_('This order changed a moment ago — refresh and try again');
+      if (!hit) fail_('Este pedido cambió hace un momento — actualiza e intenta de nuevo');
       payIxAdd_(rb.hash, txn, hit.order_no); markOpenDay_(ymd_(hit.placed_at));
       return hit;
     });
-    addLog_(who === 'guest' ? 'guest:' + phoneKey_(o.customer_phone).slice(-4) : who, 'RECEIPT_REUPLOADED', saved.order_no + ' · attempt ' + n);
+    addLog_(who === 'guest' ? 'guest:' + phoneKey_(o.customer_phone).slice(-4) : who, 'COMPROBANTE_REPETIDO', saved.order_no + ' · intento ' + n);
     notifyShop_(saved, s, 'reupload');
-    return ok_({ message:'Receipt sent — we will check it shortly', order:orderPublic_(saved, true) });
+    return ok_({ message:'Comprobante enviado — lo revisaremos en breve', order:orderPublic_(saved, true) });
   });
 }
 // the customer may cancel before the payment is approved
 function cancelMyOrder(tok, q, reason) {
   return pub_(function(){
     var o = ownOrder_(tok, q), who = (whoMaybe_(tok) || {}).u || 'guest';
-    if (!{ SUBMITTED:1, PAYMENT_REJECTED:1 }[o.status]) fail_('This order can no longer be cancelled here — please contact the shop');
+    if (!{ SUBMITTED:1, PAYMENT_REJECTED:1 }[o.status]) fail_('Este pedido ya no puede cancelarse aquí — por favor contacta a la tienda');
     var saved = withLock_(function(){
       var now = nowIso_(), hit = JDB.mutate(ORDER_SHEET, [o.id], function(x){
         if (!{ SUBMITTED:1, PAYMENT_REJECTED:1 }[x.status]) return false;
-        x.timeline = (x.timeline || []).concat({ at:now, by:who, action:'Cancelled by customer', from:x.status, to:'CANCELLED', note:String(reason || '').trim().slice(0, 200) });
-        x.status = 'CANCELLED'; x.cancelled_at = now; x.cancelled_by = 'customer'; x.cancel_reason = String(reason || '').trim().slice(0, 200) || 'Cancelled by customer';
+        x.timeline = (x.timeline || []).concat({ at:now, by:who, action:'Cancelado por el cliente', from:x.status, to:'CANCELLED', note:String(reason || '').trim().slice(0, 200) });
+        x.status = 'CANCELLED'; x.cancelled_at = now; x.cancelled_by = 'customer'; x.cancel_reason = String(reason || '').trim().slice(0, 200) || 'Cancelado por el cliente';
       }, ymd_(o.placed_at), ymd_(o.placed_at))[0];
-      if (!hit) fail_('This order changed a moment ago — refresh and try again');
+      if (!hit) fail_('Este pedido cambió hace un momento — actualiza e intenta de nuevo');
       return hit;
     });
-    addLog_(who === 'guest' ? 'guest:' + phoneKey_(o.customer_phone).slice(-4) : who, 'ORDER_CANCELLED', saved.order_no + ' · by customer');
+    addLog_(who === 'guest' ? 'guest:' + phoneKey_(o.customer_phone).slice(-4) : who, 'PEDIDO_CANCELADO', saved.order_no + ' · por el cliente');
     notifyShop_(saved, settings_(), 'cust_cancel');
-    return ok_({ message:'Order cancelled', order:orderPublic_(saved, true) });
+    return ok_({ message:'Pedido cancelado', order:orderPublic_(saved, true) });
   });
 }
 // a signed-in customer's own orders, newest first (last 180 days)
@@ -1743,33 +1745,33 @@ function getOrders(tok, from, to) {
   });
 }
 function getOrder360(tok, no) {
-  return api_(tok, 'orders', 'v', function(){ var o = findOrder_(no); if (!o) fail_('Order not found'); return ok_({ order:orderAdmin_(o) }); });
+  return api_(tok, 'orders', 'v', function(){ var o = findOrder_(no); if (!o) fail_('Pedido no encontrado'); return ok_({ order:orderAdmin_(o) }); });
 }
 // one receipt (attempt n, default the latest) as a data url — only through the gate, never a Drive link
 function getReceiptImage(tok, no, n) {
   return api_(tok, 'orders', 'v', function(){
-    var o = findOrder_(no); if (!o) fail_('Order not found');
+    var o = findOrder_(no); if (!o) fail_('Pedido no encontrado');
     var h = (o.payment_history || []).filter(function(p){ return p.n === (Number(n) || o.payment_attempt); })[0];
-    if (!h) fail_('Receipt not found');
+    if (!h) fail_('Comprobante no encontrado');
     var b = DriveApp.getFileById(h.file_id).getBlob();
     return ok_({ url:'data:' + (h.mime || b.getContentType()) + ';base64,' + Utilities.base64Encode(b.getBytes()), mime:h.mime, n:h.n });
   });
 }
 
 // ---- transitions: lock -> re-read -> check the status it must be in -> write ONE record -> timeline + log ----
-var ST_LABEL = { SUBMITTED:'Payment Review', PAYMENT_REJECTED:'Payment Rejected', CONFIRMED:'Confirmed', PREPARING:'Preparing', READY:'Ready', COMPLETED:'Completed', CANCELLED:'Cancelled' };
+var ST_LABEL = { SUBMITTED:'Revisión de Pago', PAYMENT_REJECTED:'Pago Rechazado', CONFIRMED:'Confirmado', PREPARING:'En Preparación', READY:'Listo', COMPLETED:'Completado', CANCELLED:'Cancelado' };
 function moveOrder_(me, no, from, fn) {
   return withLock_(function(){
-    var o = findOrder_(no); if (!o) fail_('Order not found');
+    var o = findOrder_(no); if (!o) fail_('Pedido no encontrado');
     if (from.indexOf(o.status) === -1) {
       var last = (o.timeline || []).slice(-1)[0] || {};
-      fail_('Order ' + o.short_no + ' is already ' + ST_LABEL[o.status] + (last.by ? ' (by ' + last.by + ')' : '') + ' — refresh');
+      fail_('El pedido ' + o.short_no + ' ya está ' + ST_LABEL[o.status] + (last.by ? ' (por ' + last.by + ')' : '') + ' — actualiza');
     }
     var now = nowIso_(), was = o.status;
     var hit = JDB.mutate(ORDER_SHEET, [o.id], function(x){ var r = fn(x, now); x.timeline = (x.timeline || []).concat({ at:now, by:me.u, action:r.action, from:was, to:x.status, note:r.note || '' }); },
       ymd_(o.placed_at), ymd_(o.placed_at))[0];
     if (isOpenWork_(hit)) markOpenDay_(ymd_(hit.placed_at));
-    addLog_(me.u, hit.status === 'CANCELLED' && was !== 'CANCELLED' ? 'ORDER_CANCELLED' : 'ORDER_STATUS', hit.order_no + ' · ' + ST_LABEL[was] + ' → ' + ST_LABEL[hit.status]);
+    addLog_(me.u, hit.status === 'CANCELLED' && was !== 'CANCELLED' ? 'PEDIDO_CANCELADO' : 'ESTADO_PEDIDO', hit.order_no + ' · ' + ST_LABEL[was] + ' → ' + ST_LABEL[hit.status]);
     return hit;
   });
 }
@@ -1784,36 +1786,36 @@ var localToIso_ = function(l){ var guess = new Date(l + ':00Z'), off = Utilities
   var mins = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0; return new Date(guess.getTime() - mins * 60000).toISOString(); };
 function approvePayment(tok, no, checked) {
   return api_(tok, 'orders', 'e', function(me){
-    if (checked !== true) return err_('Tick "I have checked my bank / wallet app" first');
+    if (checked !== true) return err_('Marca "He verificado mi aplicación bancaria / billetera" primero');
     var s = settings_(), o = moveOrder_(me, no, ['SUBMITTED'], function(x, now){
       x.status = 'CONFIRMED'; x.verified_by = me.u; x.paid_at = now; x.eta_at = etaOf_(x, now, s);
       var h = x.payment_history[x.payment_history.length - 1]; if (h) { h.result = 'APPROVED'; h.by = me.u; }
-      return { action:'Payment approved', note:x.payment_snapshot.name + ' · ' + s.currency_symbol + x.grand_total };
+      return { action:'Pago aprobado', note:x.payment_snapshot.name + ' · ' + s.currency_symbol + x.grand_total };
     });
     notifyCustomer_(o, 'approved', s);
-    return ok_({ message:'Payment approved — ' + o.short_no + ' is confirmed', order:orderAdmin_(o) });
+    return ok_({ message:'Pago aprobado — ' + o.short_no + ' está confirmado', order:orderAdmin_(o) });
   });
 }
-var REJECT_WHY = ["Amount doesn't match", 'Payment not received', 'Receipt unreadable', 'Receipt already used', 'Other'];
+var REJECT_WHY = ["El monto no coincide", 'Pago no recibido', 'Comprobante ilegible', 'Comprobante ya utilizado', 'Otro'];
 function rejectPayment(tok, no, reason) {
   return api_(tok, 'orders', 'e', function(me){
-    var why = String(reason || '').trim().slice(0, 200); if (why.length < 3) return err_('Pick or type the reason');
+    var why = String(reason || '').trim().slice(0, 200); if (why.length < 3) return err_('Elige o escribe el motivo');
     var s = settings_(), o = moveOrder_(me, no, ['SUBMITTED'], function(x){
       x.status = 'PAYMENT_REJECTED'; x.reject_reason = why;
       var h = x.payment_history[x.payment_history.length - 1]; if (h) { h.result = 'REJECTED'; h.reason = why; h.by = me.u; }
-      return { action:'Payment rejected', note:why };
+      return { action:'Pago rechazado', note:why };
     });
     notifyCustomer_(o, 'rejected', s, { left:Math.max(0, (Number(s.reupload_max) || 3) - o.payment_attempt) });
-    return ok_({ message:'Payment rejected — the customer can send a new receipt', order:orderAdmin_(o) });
+    return ok_({ message:'Pago rechazado — el cliente puede enviar un nuevo comprobante', order:orderAdmin_(o) });
   });
 }
 // the kitchen moves: Confirmed -> Preparing -> Ready -> Completed (Picked up / Delivered)
-var NEXT_ST = { CONFIRMED:['PREPARING', 'prep_started_at', 'Preparing started'], PREPARING:['READY', 'ready_at', 'Marked ready'], READY:['COMPLETED', 'completed_at', 'Handed over'] };
+var NEXT_ST = { CONFIRMED:['PREPARING', 'prep_started_at', 'Preparación iniciada'], PREPARING:['READY', 'ready_at', 'Marcado como listo'], READY:['COMPLETED', 'completed_at', 'Entregado'] };
 function stepOrder_(me, no, to, s) {
   var from = Object.keys(NEXT_ST).filter(function(k){ return NEXT_ST[k][0] === to; })[0];
-  if (!from) fail_('Not a valid step');
+  if (!from) fail_('Paso no válido');
   var o = moveOrder_(me, no, [from], function(x, now){ var n = NEXT_ST[x.status]; x.status = n[0]; x[n[1]] = now;
-    return { action:n[0] === 'COMPLETED' ? (x.fulfilment === 'DELIVERY' ? 'Delivered' : 'Picked up') : n[2] }; });
+    return { action:n[0] === 'COMPLETED' ? (x.fulfilment === 'DELIVERY' ? 'Entregado a domicilio' : 'Retirado') : n[2] }; });
   if (to === 'READY') notifyCustomer_(o, 'ready', s);
   if (to === 'COMPLETED') notifyCustomer_(o, 'completed', s);
   return o;
@@ -1825,8 +1827,8 @@ function setOrderStatus(tok, no, to) {
 // bulk: Mark ready / Complete only (payments are never approved in bulk) — skip-and-collect
 function bulkOrderStatus(tok, nos, to) {
   return api_(tok, 'orders', 'e', function(me){
-    if (['READY', 'COMPLETED'].indexOf(to) === -1) return err_('Only "Mark ready" and "Complete" work in bulk');
-    if (!nos || !nos.length) return err_('Nothing selected');
+    if (['READY', 'COMPLETED'].indexOf(to) === -1) return err_('Solo "Marcar como listo" y "Completar" funcionan en lote');
+    if (!nos || !nos.length) return err_('Nada seleccionado');
     var s = settings_(), done = [], skipped = [];
     nos.slice(0, 100).forEach(function(no){ try { done.push(orderAdmin_(stepOrder_(me, no, to, s))); } catch (e) { skipped.push(no + ': ' + ((e && e.user) || e)); } });
     return ok_({ count:done.length, orders:done, skipped:skipped.length, skippedNames:skipped });
@@ -1836,40 +1838,40 @@ function bulkOrderStatus(tok, nos, to) {
 var BACK_ST = { PREPARING:['CONFIRMED', 'prep_started_at'], READY:['PREPARING', 'ready_at'], COMPLETED:['READY', 'completed_at'] };
 function undoOrderStep(tok, no, reason) {
   return api_(tok, 'orders', 'e', function(me){
-    var why = String(reason || '').trim().slice(0, 200); if (why.length < 3) return err_('Give the reason for the undo');
-    var o = moveOrder_(me, no, Object.keys(BACK_ST), function(x){ var b = BACK_ST[x.status]; x.status = b[0]; x[b[1]] = ''; return { action:'Undone', note:why }; });
-    return ok_({ message:o.short_no + ' back to ' + ST_LABEL[o.status], order:orderAdmin_(o) });
+    var why = String(reason || '').trim().slice(0, 200); if (why.length < 3) return err_('Indica el motivo para deshacer');
+    var o = moveOrder_(me, no, Object.keys(BACK_ST), function(x){ var b = BACK_ST[x.status]; x.status = b[0]; x[b[1]] = ''; return { action:'Deshecho', note:why }; });
+    return ok_({ message:o.short_no + ' regresó a ' + ST_LABEL[o.status], order:orderAdmin_(o) });
   });
 }
 // cancel (never delete). A paid order (Confirmed / Preparing) is marked "refund pending"
 function cancelOrder(tok, no, reason) {
   return api_(tok, 'orders', 'd', function(me){
-    var why = String(reason || '').trim().slice(0, 200); if (why.length < 3) return err_('Give the reason for cancelling');
+    var why = String(reason || '').trim().slice(0, 200); if (why.length < 3) return err_('Indica el motivo de cancelación');
     var o = moveOrder_(me, no, ['SUBMITTED', 'PAYMENT_REJECTED', 'CONFIRMED', 'PREPARING'], function(x, now){
       var paid = x.status === 'CONFIRMED' || x.status === 'PREPARING';
       x.status = 'CANCELLED'; x.cancelled_at = now; x.cancelled_by = me.u; x.cancel_reason = why; if (paid) x.refund_status = 'PENDING';
-      return { action:'Cancelled', note:why + (paid ? ' · refund pending' : '') };
+      return { action:'Cancelado', note:why + (paid ? ' · reembolso pendiente' : '') };
     });
     notifyCustomer_(o, 'cancelled', settings_());
-    return ok_({ message:o.short_no + ' cancelled' + (o.refund_status === 'PENDING' ? ' — refund pending' : ''), order:orderAdmin_(o) });
+    return ok_({ message:o.short_no + ' cancelado' + (o.refund_status === 'PENDING' ? ' — reembolso pendiente' : ''), order:orderAdmin_(o) });
   });
 }
 function markRefunded(tok, no, note) {
   return api_(tok, 'orders', 'e', function(me){
-    var o = withLock_(function(){ var x0 = findOrder_(no); if (!x0) fail_('Order not found'); if (x0.refund_status !== 'PENDING') fail_('No refund is pending on this order');
+    var o = withLock_(function(){ var x0 = findOrder_(no); if (!x0) fail_('Pedido no encontrado'); if (x0.refund_status !== 'PENDING') fail_('No hay reembolso pendiente para este pedido');
       var now = nowIso_();
       return JDB.mutate(ORDER_SHEET, [x0.id], function(x){ x.refund_status = 'REFUNDED'; x.refund_note = String(note || '').trim().slice(0, 200);
-        x.timeline = (x.timeline || []).concat({ at:now, by:me.u, action:'Refund marked', from:x.status, to:x.status, note:x.refund_note }); }, ymd_(x0.placed_at), ymd_(x0.placed_at))[0]; });
-    addLog_(me.u, 'REFUND_MARKED', o.order_no + (o.refund_note ? ' · ' + o.refund_note : ''));
+        x.timeline = (x.timeline || []).concat({ at:now, by:me.u, action:'Reembolso registrado', from:x.status, to:x.status, note:x.refund_note }); }, ymd_(x0.placed_at), ymd_(x0.placed_at))[0]; });
+    addLog_(me.u, 'REEMBOLSO_REGISTRADO', o.order_no + (o.refund_note ? ' · ' + o.refund_note : ''));
     notifyCustomer_(o, 'refunded', settings_());
-    return ok_({ message:'Refund recorded', order:orderAdmin_(o) });
+    return ok_({ message:'Reembolso registrado', order:orderAdmin_(o) });
   });
 }
 function saveAdminNote(tok, no, note) {
   return api_(tok, 'orders', 'e', function(me){
-    var o = withLock_(function(){ var x0 = findOrder_(no); if (!x0) fail_('Order not found');
+    var o = withLock_(function(){ var x0 = findOrder_(no); if (!x0) fail_('Pedido no encontrado');
       return JDB.update(ORDER_SHEET, x0.id, { admin_note:String(note || '').trim().slice(0, 300) }, ymd_(x0.placed_at)); });
-    return ok_({ message:'Note saved', order:orderAdmin_(o) });
+    return ok_({ message:'Nota guardada', order:orderAdmin_(o) });
   });
 }
 // ============== Email notifications — one branded template, a switch per event (Settings → Notifications) ==============
@@ -1880,9 +1882,18 @@ var MAIL_TONE = { ok:'#34a853', warn:'#fbbc04', bad:'#ea4335', info:'#0074D9' };
 var mailOn_ = function(s, ev){ return !!Number(ev.indexOf('shop.') === 0 ? s.notify_shop : s.notify_customer) && (',' + s.notify_events + ',').indexOf(',' + ev + ',') !== -1; };
 // "a@x.com; b@y.com" -> "a@x.com, b@y.com" — up to 5, each checked
 var mailList_ = function(v){ var a = String(v || '').split(/[\s,;]+/).filter(String);
-  if (a.length > 5) fail_('Up to 5 notification emails'); a.forEach(function(e){ if (!EMAIL_RX.test(e)) fail_('Not a valid email: ' + e); }); return a.join(', '); };
-var mailMoney_ = function(s){ var dp = Number(s.currency_decimals) === 0 ? 0 : 2; return function(v){ return s.currency_symbol + Number(v || 0).toFixed(dp); }; };
-var pickupOf_ = function(o){ return (o.fulfilment === 'DELIVERY' ? 'Delivery' : 'Pickup') + ' · ' + (o.pickup_mode === 'SCHEDULED' ? String(o.pickup_at).slice(11, 16) : 'ASAP'); };
+  if (a.length > 5) fail_('Hasta 5 correos de notificación'); a.forEach(function(e){ if (!EMAIL_RX.test(e)) fail_('Correo no válido: ' + e); }); return a.join(', '); };
+var mailMoney_ = function(s){
+  var dp = Number(s.currency_decimals) === 2 ? 2 : 0;
+  return function(v){
+    var n = Number(v || 0);
+    var parts = n.toFixed(dp).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    var sym = s.currency_symbol || '$';
+    return sym + (sym.endsWith(' ') ? '' : ' ') + (dp > 0 ? parts.join(',') : parts[0]);
+  };
+};
+var pickupOf_ = function(o){ return (o.fulfilment === 'DELIVERY' ? 'Entrega' : 'Retiro') + ' · ' + (o.pickup_mode === 'SCHEDULED' ? String(o.pickup_at).slice(11, 16) : 'Inmediato'); };
 var appUrl_ = function(){ try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; } };
 
 // the one template: header · tone bar · title + intro · order table or key/values · button · shop footer (inline styles — mail clients drop <style>)
@@ -1893,7 +1904,7 @@ function mailHtml_(s, m) {
     return '<tr><td style="' + td + '"><b>' + l.qty + '× ' + e(l.product_name) + '</b>' + (opt ? '<br><span style="color:#6b7280;font-size:12px">' + e(opt) + '</span>' : '') +
       '</td><td style="' + td + ';text-align:right;white-space:nowrap">' + M(l.line_total) + '</td></tr>'; }).join('') +
     '<tr><td style="padding:6px 0;color:#6b7280">Subtotal</td><td style="padding:6px 0;text-align:right">' + M(o.subtotal) + '</td></tr>' +
-    (Number(o.delivery_fee) ? '<tr><td style="padding:6px 0;color:#6b7280">Delivery</td><td style="padding:6px 0;text-align:right">' + M(o.delivery_fee) + '</td></tr>' : '') +
+    (Number(o.delivery_fee) ? '<tr><td style="padding:6px 0;color:#6b7280">Entrega</td><td style="padding:6px 0;text-align:right">' + M(o.delivery_fee) + '</td></tr>' : '') +
     '<tr><td style="padding:8px 0;font-size:16px;font-weight:700">Total</td><td style="padding:8px 0;font-size:16px;font-weight:700;text-align:right">' + M(o.grand_total) + '</td></tr>' : '';
   var kv = (m.kv || []).map(function(r){ return '<tr><td style="' + td + ';color:#6b7280">' + e(r[0]) + '</td><td style="' + td + ';text-align:right;font-weight:600">' + e(r[1]) + '</td></tr>'; }).join('');
   var foot = [s.shop_address, s.shop_phone, s.shop_email].filter(function(x){ return String(x || '').trim(); }).map(e).join(' · ');
@@ -1904,7 +1915,7 @@ function mailHtml_(s, m) {
     '<div style="height:4px;background:' + (MAIL_TONE[m.tone] || MAIL_TONE.info) + '"></div><div style="padding:22px">' +
     '<h1 style="margin:0 0 8px;font-size:20px;line-height:1.3;color:#001f3f">' + e(m.title) + '</h1>' +
     '<p style="margin:0;font-size:14px;line-height:1.6">' + m.intro + '</p>' +            // intro arrives escaped
-    (o ? '<p style="margin:14px 0 0;color:#6b7280;font-size:13px">Order <b style="color:#001f3f">' + e(o.short_no) + '</b> · ' + e(o.order_no) + '<br>' + e(pickupOf_(o)) +
+    (o ? '<p style="margin:14px 0 0;color:#6b7280;font-size:13px">Pedido <b style="color:#001f3f">' + e(o.short_no) + '</b> · ' + e(o.order_no) + '<br>' + e(pickupOf_(o)) +
       ((o.payment_snapshot || {}).name ? ' · ' + e(o.payment_snapshot.name) : '') + '</p>' : '') +
     (lines || kv ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;font-size:14px;border-collapse:collapse">' + lines + kv + '</table>' : '') +
     (m.button && m.button[1] ? '<p style="margin:22px 0 4px"><a href="' + e(m.button[1]) + '" style="display:inline-block;padding:12px 26px;background:#001f3f;color:#ffffff;text-decoration:none;border-radius:4px;font-weight:700">' + e(m.button[0]) + '</a></p>' : '') +
@@ -1915,37 +1926,37 @@ function mailHtml_(s, m) {
 function mailOf_(ev, o, s, x) {
   x = x || {};
   var e = escHtml_, M = mailMoney_(s), app = appUrl_(), track = o && o.track_token && app ? app + '?track=' + o.track_token : app;
-  var hi = function(n){ return e(String(n || '').trim().split(/\s+/)[0] || 'there'); }, review = app && app + '?page=review';
-  var flag = o && (o.dup_receipt_order || o.dup_txn_order) ? ' <b style="color:#ea4335">Duplicate payment flag — check it carefully.</b>' : '';
+  var hi = function(n){ return e(String(n || '').trim().split(/\s+/)[0] || 'Hola'); }, review = app && app + '?page=review';
+  var flag = o && (o.dup_receipt_order || o.dup_txn_order) ? ' <b style="color:#ea4335">Aviso de pago duplicado — revísalo con atención.</b>' : '';
   var cust = function(subj, m){ return { to:EMAIL_RX.test(String(o.customer_email || '')) ? o.customer_email : '', subject:subj,
-    m:Object.assign({ order:o, button:['Track your order', track], why:'You get this email because you ordered at ' + s.shop_name + '.' }, m) }; };
-  var shop = function(subj, m){ return { to:String(s.notify_shop_email || ''), subject:subj, m:Object.assign({ why:'Shop notification — change it in Settings → Notifications.' }, m) }; };
+    m:Object.assign({ order:o, button:['Seguir tu pedido', track], why:'Recibes este correo porque hiciste un pedido en ' + s.shop_name + '.' }, m) }; };
+  var shop = function(subj, m){ return { to:String(s.notify_shop_email || ''), subject:subj, m:Object.assign({ why:'Notificación de la tienda — cámbiala en Configuración → Notificaciones.' }, m) }; };
   var r = null;
   switch (ev) {
-    case 'shop.new_order': r = shop('new order ' + o.short_no + ' (' + M(o.grand_total) + ')', { title:'New order ' + o.short_no, tone:'info', order:o,
-      intro:e(o.customer_name) + ' · ' + e(o.customer_phone) + ' — check the receipt in Payment Review.' + flag, button:['Open Payment Review', review] }); break;
-    case 'shop.reupload': r = shop('new receipt for ' + o.short_no, { title:'New receipt for ' + o.short_no, tone:'warn', order:o,
-      intro:e(o.customer_name) + ' sent receipt attempt ' + o.payment_attempt + (o.txn_ref ? ' (txn ' + e(o.txn_ref) + ')' : '') + ' — the order is back in Payment Review.' + flag, button:['Open Payment Review', review] }); break;
-    case 'shop.cust_cancel': r = shop(o.short_no + ' cancelled by the customer', { title:o.short_no + ' was cancelled by the customer', tone:'bad', order:o,
-      intro:e(o.customer_name) + (o.cancel_reason ? ' gave this reason: ' + e(o.cancel_reason) : ' cancelled before the payment was approved') + '.' }); break;
-    case 'shop.signup': r = shop('new customer ' + x.name, { title:'New customer account', tone:'ok', intro:e(x.name) + ' just signed up.', kv:[['Email', x.email], ['Phone', x.phone || '—']] }); break;
-    case 'shop.daily': r = shop('daily summary ' + x.day, { title:'Daily summary — ' + x.day, tone:'info', intro:'Yesterday at ' + e(s.shop_name) + ', at a glance.', kv:dailyOf_(x.day, s), button:['Open the dashboard', app] }); break;
-    case 'customer.received': r = cust('we got your order ' + o.short_no, { title:'Thanks, ' + hi(o.customer_name) + ' — we got your order', tone:'info',
-      intro:'We are checking your payment now. You will get another email the moment it is confirmed.' }); break;
-    case 'customer.approved': r = cust('your order ' + o.short_no + ' is confirmed', { title:'Your order ' + o.short_no + ' is confirmed', tone:'ok',
-      intro:'We received your payment — your drinks are being made' + (o.eta_at ? ' and should be ready around <b>' + e(Utilities.formatDate(new Date(o.eta_at), tz_(), 'HH:mm')) + '</b>' : '') + '.' }); break;
-    case 'customer.rejected': r = cust('we could not confirm the payment for ' + o.short_no, { title:'We could not confirm your payment', tone:'bad', button:['Send a new receipt', track],
-      intro:'Reason: <b>' + e(o.reject_reason) + '</b>. Open your order and send a new receipt' + (x.left != null ? ' — you have ' + x.left + ' attempt' + (x.left === 1 ? '' : 's') + ' left' : '') + '.' }); break;
-    case 'customer.ready': r = cust('your order ' + o.short_no + ' is ready', { title:'Your order ' + o.short_no + ' is ready', tone:'ok',
-      intro:o.fulfilment === 'DELIVERY' ? 'Your order is on its way.' : 'Come and pick it up — show the order number at the counter.' }); break;
-    case 'customer.completed': r = cust('thank you — receipt for ' + o.short_no, { title:'Thank you, ' + hi(o.customer_name) + '!', tone:'ok', button:['Order again', app && app + '?page=menu'],
-      intro:'Enjoy your drinks. Here is your receipt — see you again soon.' }); break;
-    case 'customer.cancelled': r = cust('order ' + o.short_no + ' was cancelled', { title:'Your order ' + o.short_no + ' was cancelled', tone:'bad',
-      intro:(o.cancel_reason ? 'Reason: <b>' + e(o.cancel_reason) + '</b>. ' : '') + (o.refund_status === 'PENDING' ? 'Your payment will be refunded — we will email you as soon as it is sent.' : 'You have not been charged for it.') }); break;
-    case 'customer.refunded': r = cust('your refund for ' + o.short_no + ' was sent', { title:'Your refund was sent', tone:'ok',
-      intro:'We sent back <b>' + M(o.grand_total) + '</b> for order ' + e(o.short_no) + '.' + (o.refund_note ? ' Note: ' + e(o.refund_note) : '') }); break;
-    case 'customer.welcome': r = { to:x.email, subject:'welcome to ' + s.shop_name, m:{ title:'Welcome, ' + hi(x.name) + '!', tone:'ok', button:['Order now', app && app + '?page=menu'],
-      intro:'Your account is ready. Your details are saved for a faster checkout, and My Orders keeps every order in one place.', why:'You get this email because you created an account at ' + s.shop_name + '.' } }; break;
+    case 'shop.new_order': r = shop('nuevo pedido ' + o.short_no + ' (' + M(o.grand_total) + ')', { title:'Nuevo pedido ' + o.short_no, tone:'info', order:o,
+      intro:e(o.customer_name) + ' · ' + e(o.customer_phone) + ' — revisa el comprobante en Revisión de Pagos.' + flag, button:['Abrir Revisión de Pagos', review] }); break;
+    case 'shop.reupload': r = shop('nuevo comprobante para ' + o.short_no, { title:'Nuevo comprobante para ' + o.short_no, tone:'warn', order:o,
+      intro:e(o.customer_name) + ' envió el intento de comprobante ' + o.payment_attempt + (o.txn_ref ? ' (transacción ' + e(o.txn_ref) + ')' : '') + ' — el pedido está nuevamente en Revisión de Pagos.' + flag, button:['Abrir Revisión de Pagos', review] }); break;
+    case 'shop.cust_cancel': r = shop(o.short_no + ' cancelado por el cliente', { title:o.short_no + ' fue cancelado por el cliente', tone:'bad', order:o,
+      intro:e(o.customer_name) + (o.cancel_reason ? ' dio este motivo: ' + e(o.cancel_reason) : ' canceló antes de que se aprobara el pago') + '.' }); break;
+    case 'shop.signup': r = shop('nuevo cliente ' + x.name, { title:'Nueva cuenta de cliente', tone:'ok', intro:e(x.name) + ' acaba de registrarse.', kv:[['Correo electrónico', x.email], ['Teléfono', x.phone || '—']] }); break;
+    case 'shop.daily': r = shop('resumen diario ' + x.day, { title:'Resumen diario — ' + x.day, tone:'info', intro:'Ayer en ' + e(s.shop_name) + ', de un vistazo.', kv:dailyOf_(x.day, s), button:['Abrir el panel', app] }); break;
+    case 'customer.received': r = cust('recibimos tu pedido ' + o.short_no, { title:'¡Gracias, ' + hi(o.customer_name) + '! — Recibimos tu pedido', tone:'info',
+      intro:'Estamos revisando tu pago en este momento. Recibirás otro correo tan pronto sea confirmado.' }); break;
+    case 'customer.approved': r = cust('tu pedido ' + o.short_no + ' está confirmado', { title:'Tu pedido ' + o.short_no + ' está confirmado', tone:'ok',
+      intro:'Recibimos tu pago — tus bebidas se están preparando' + (o.eta_at ? ' y deberían estar listas alrededor de las <b>' + e(Utilities.formatDate(new Date(o.eta_at), tz_(), 'HH:mm')) + '</b>' : '') + '.' }); break;
+    case 'customer.rejected': r = cust('no pudimos confirmar el pago para ' + o.short_no, { title:'No pudimos confirmar tu pago', tone:'bad', button:['Enviar un nuevo comprobante', track],
+      intro:'Motivo: <b>' + e(o.reject_reason) + '</b>. Abre tu pedido y envía un nuevo comprobante' + (x.left != null ? ' — te queda' + (x.left === 1 ? ' ' : 'n ') + x.left + ' intento' + (x.left === 1 ? '' : 's') : '') + '.' }); break;
+    case 'customer.ready': r = cust('tu pedido ' + o.short_no + ' está listo', { title:'Tu pedido ' + o.short_no + ' está listo', tone:'ok',
+      intro:o.fulfilment === 'DELIVERY' ? 'Tu pedido está en camino.' : 'Ven a recogerlo — muestra el número de pedido en el mostrador.' }); break;
+    case 'customer.completed': r = cust('gracias — comprobante para ' + o.short_no, { title:'¡Muchas gracias, ' + hi(o.customer_name) + '!', tone:'ok', button:['Pedir de nuevo', app && app + '?page=menu'],
+      intro:'¡Disfruta tus bebidas! Aquí tienes tu comprobante — esperamos verte pronto.' }); break;
+    case 'customer.cancelled': r = cust('el pedido ' + o.short_no + ' fue cancelado', { title:'Tu pedido ' + o.short_no + ' fue cancelado', tone:'bad',
+      intro:(o.cancel_reason ? 'Motivo: <b>' + e(o.cancel_reason) + '</b>. ' : '') + (o.refund_status === 'PENDING' ? 'Tu pago será reembolsado — te enviaremos un correo tan pronto sea enviado.' : 'No se te ha cobrado nada por este pedido.') }); break;
+    case 'customer.refunded': r = cust('tu reembolso para ' + o.short_no + ' fue enviado', { title:'Tu reembolso fue enviado', tone:'ok',
+      intro:'Te reembolsamos <b>' + M(o.grand_total) + '</b> por el pedido ' + e(o.short_no) + '.' + (o.refund_note ? ' Nota: ' + e(o.refund_note) : '') }); break;
+    case 'customer.welcome': r = { to:x.email, subject:'bienvenido a ' + s.shop_name, m:{ title:'¡Bienvenido, ' + hi(x.name) + '!', tone:'ok', button:['Pedir ahora', app && app + '?page=menu'],
+      intro:'Tu cuenta está lista. Tus datos están guardados para compras más rápidas, y Mis Pedidos guarda todo tu historial en un solo lugar.', why:'Recibes este correo porque creaste una cuenta en ' + s.shop_name + '.' } }; break;
   }
   return r && { to:r.to, subject:s.shop_name + ' — ' + r.subject, html:mailHtml_(s, r.m) };
 }
@@ -1955,8 +1966,8 @@ function dailyOf_(day, s) {
   var sales = paid.reduce(function(t, o){ return t + Number(o.grand_total); }, 0);
   paid.forEach(function(o){ (o.items || []).forEach(function(l){ drinks += l.qty; top[l.product_name] = (top[l.product_name] || 0) + l.qty; }); });
   var best = Object.keys(top).sort(function(a, b){ return top[b] - top[a]; })[0];
-  return [['Sales', M(sales)], ['Paid orders', String(paid.length)], ['Average order', M(paid.length ? sales / paid.length : 0)], ['Drinks sold', String(drinks)],
-    ['Best seller', best ? best + ' · ' + top[best] : '—'], ['Cancelled', String(L.filter(function(o){ return o.status === 'CANCELLED'; }).length)]];
+  return [['Ventas', M(sales)], ['Pedidos pagados', String(paid.length)], ['Ticket promedio', M(paid.length ? sales / paid.length : 0)], ['Bebidas vendidas', String(drinks)],
+    ['Más vendido', best ? best + ' · ' + top[best] : '—'], ['Cancelados', String(L.filter(function(o){ return o.status === 'CANCELLED'; }).length)]];
 }
 // send = switch on + a recipient + quota left; never throws, never blocks the action that fired it
 function mailSend_(ev, o, s, x) {
@@ -1964,7 +1975,7 @@ function mailSend_(ev, o, s, x) {
     if (!mailOn_(s, ev)) return false;
     var m = mailOf_(ev, o, s, x); if (!m || !m.to) return false;
     if (MailApp.getRemainingDailyQuota() < 1) { Logger.log('mail quota used up: ' + ev); return false; }
-    var opt = { to:m.to, subject:m.subject, htmlBody:m.html, name:String(s.shop_name || 'Shop').slice(0, 60) };
+    var opt = { to:m.to, subject:m.subject, htmlBody:m.html, name:String(s.shop_name || 'Tienda').slice(0, 60) };
     if (EMAIL_RX.test(String(s.shop_email || ''))) opt.replyTo = s.shop_email;
     MailApp.sendEmail(opt);
     return true;
@@ -2000,19 +2011,19 @@ function seedOrders_() {
         pickup_mode:'ASAP', pickup_at:'', order_note:'', items:lines, item_count:lines.reduce(function(x, l){ return x + l.qty; }, 0), subtotal:sub, delivery_fee:0, grand_total:sub,
         payment_method_id:m.id, payment_snapshot:{ name:m.name, bank_name:m.bank_name, account_name:m.account_name, account_last4:String(m.account_number || '').slice(-4), had_qr:m.qr_image_id ? 1 : 0 },
         receipt_file_id:rcpt, receipt_hash:'seed' + no, receipt_mime:'image/png', txn_ref:'TXN' + (40000 + seq[d] * 13 + day * 101), payment_attempt:1,
-        payment_history:[{ n:1, file_id:rcpt, hash:'seed' + no, mime:'image/png', txn_ref:'TXN' + (40000 + seq[d] * 13 + day * 101), at:at, result:paid ? 'APPROVED' : st === 'PAYMENT_REJECTED' ? 'REJECTED' : '', reason:st === 'PAYMENT_REJECTED' ? "Amount doesn't match" : '', by:c[0] || 'guest' }],
-        dup_receipt_order:'', dup_txn_order:'', status:st, verified_by:paid ? 'admin' : '', paid_at:paid ? t(4) : '', reject_reason:st === 'PAYMENT_REJECTED' ? "Amount doesn't match" : '', eta_at:paid ? t(4 + Number(s.prep_minutes)) : '',
+        payment_history:[{ n:1, file_id:rcpt, hash:'seed' + no, mime:'image/png', txn_ref:'TXN' + (40000 + seq[d] * 13 + day * 101), at:at, result:paid ? 'APPROVED' : st === 'PAYMENT_REJECTED' ? 'REJECTED' : '', reason:st === 'PAYMENT_REJECTED' ? "El monto no coincide" : '', by:c[0] || 'guest' }],
+        dup_receipt_order:'', dup_txn_order:'', status:st, verified_by:paid ? 'admin' : '', paid_at:paid ? t(4) : '', reject_reason:st === 'PAYMENT_REJECTED' ? "El monto no coincide" : '', eta_at:paid ? t(4 + Number(s.prep_minutes)) : '',
         prep_started_at:{ PREPARING:1, READY:1, COMPLETED:1 }[st] ? t(6) : '', ready_at:{ READY:1, COMPLETED:1 }[st] ? t(14) : '', completed_at:st === 'COMPLETED' ? t(20) : '',
-        cancelled_at:st === 'CANCELLED' ? t(8) : '', cancelled_by:st === 'CANCELLED' ? 'admin' : '', cancel_reason:st === 'CANCELLED' ? 'Customer asked to cancel' : '', refund_status:st === 'CANCELLED' && paid ? (day > 2 ? 'REFUNDED' : 'PENDING') : 'NONE',
-        refund_note:st === 'CANCELLED' && paid && day > 2 ? 'Returned to the same account' : '', admin_note:'', created:at, created_by:c[0] || 'guest',
-        timeline:[{ at:at, by:c[0] || 'guest', action:'Order placed', from:'', to:'SUBMITTED', note:m.name }] };
-      if (paid) o.timeline.push({ at:t(4), by:'admin', action:'Payment approved', from:'SUBMITTED', to:'CONFIRMED', note:'' });
-      if (st === 'PAYMENT_REJECTED') o.timeline.push({ at:t(5), by:'admin', action:'Payment rejected', from:'SUBMITTED', to:'PAYMENT_REJECTED', note:o.reject_reason });
-      if (o.prep_started_at) o.timeline.push({ at:t(6), by:'admin', action:'Preparing started', from:'CONFIRMED', to:'PREPARING', note:'' });
-      if (o.ready_at) o.timeline.push({ at:t(14), by:'admin', action:'Marked ready', from:'PREPARING', to:'READY', note:'' });
-      if (o.completed_at) o.timeline.push({ at:t(20), by:'admin', action:'Picked up', from:'READY', to:'COMPLETED', note:'' });
-      if (st === 'CANCELLED') o.timeline.push({ at:t(8), by:'admin', action:'Cancelled', from:paid ? 'CONFIRMED' : 'SUBMITTED', to:'CANCELLED', note:o.cancel_reason + (paid ? ' · refund pending' : '') });
-      if (o.refund_status === 'REFUNDED') o.timeline.push({ at:t(90), by:'admin', action:'Refund marked', from:'CANCELLED', to:'CANCELLED', note:o.refund_note });
+        cancelled_at:st === 'CANCELLED' ? t(8) : '', cancelled_by:st === 'CANCELLED' ? 'admin' : '', cancel_reason:st === 'CANCELLED' ? 'El cliente solicitó cancelar' : '', refund_status:st === 'CANCELLED' && paid ? (day > 2 ? 'REFUNDED' : 'PENDING') : 'NONE',
+        refund_note:st === 'CANCELLED' && paid && day > 2 ? 'Devuelto a la misma cuenta' : '', admin_note:'', created:at, created_by:c[0] || 'guest',
+        timeline:[{ at:at, by:c[0] || 'guest', action:'Pedido realizado', from:'', to:'SUBMITTED', note:m.name }] };
+      if (paid) o.timeline.push({ at:t(4), by:'admin', action:'Pago aprobado', from:'SUBMITTED', to:'CONFIRMED', note:'' });
+      if (st === 'PAYMENT_REJECTED') o.timeline.push({ at:t(5), by:'admin', action:'Pago rechazado', from:'SUBMITTED', to:'PAYMENT_REJECTED', note:o.reject_reason });
+      if (o.prep_started_at) o.timeline.push({ at:t(6), by:'admin', action:'Preparación iniciada', from:'CONFIRMED', to:'PREPARING', note:'' });
+      if (o.ready_at) o.timeline.push({ at:t(14), by:'admin', action:'Marcado como listo', from:'PREPARING', to:'READY', note:'' });
+      if (o.completed_at) o.timeline.push({ at:t(20), by:'admin', action:'Retirado', from:'READY', to:'COMPLETED', note:'' });
+      if (st === 'CANCELLED') o.timeline.push({ at:t(8), by:'admin', action:'Cancelado', from:paid ? 'CONFIRMED' : 'SUBMITTED', to:'CANCELLED', note:o.cancel_reason + (paid ? ' · reembolso pendiente' : '') });
+      if (o.refund_status === 'REFUNDED') o.timeline.push({ at:t(90), by:'admin', action:'Reembolso registrado', from:'CANCELLED', to:'CANCELLED', note:o.refund_note });
       out.push(o);
       if (isOpenWork_(o)) open[d] = 1;
     }
@@ -2058,7 +2069,7 @@ function dashRange_(key, from, to) {
   if (key === 'mtd') { var f = t.slice(0, 8) + '01', pm = addDays_(f, -1).slice(0, 8) + '01', last = addDays_(f, -1), same = pm.slice(0, 8) + t.slice(8);
     return { from:f, to:t, pf:pm, pt:same > last ? last : same }; }
   from = ymd_(from) || t; to = ymd_(to) || from; if (to < from) { var x = from; from = to; to = x; }
-  if (daysIn_(from, to).length > 366) fail_('Pick a range of one year or less');
+  if (daysIn_(from, to).length > 366) fail_('Elige un rango de un año o menos');
   n = daysIn_(from, to).length; return { from:from, to:to, pf:addDays_(from, -n), pt:addDays_(from, -1) };
 }
 function getDashboard(tok, key, from, to) {
@@ -2100,7 +2111,7 @@ function openHours_(day) {
 function getReport(tok, from, to, f) {
   return api_(tok, 'reports', 'v', function(){
     from = ymd_(from) || todayYmd_(); to = ymd_(to) || from; if (to < from) { var x = from; from = to; to = x; }
-    if (daysIn_(from, to).length > 366) fail_('Pick a period of one year or less');
+    if (daysIn_(from, to).length > 366) fail_('Elige un período de un año o menos');
     f = f || {};
     var list = ordersIn_(from, to).filter(function(o){ return (!f.method || String(o.payment_method_id) === String(f.method)) && (!f.ful || o.fulfilment === f.ful) && (!f.type || o.checkout_type === f.type); });
     var paid = list.filter(isPaid_), k = kpis_(list), pct = function(v){ return k.sales ? Math.round(v / k.sales * 1000) / 10 : 0; };
@@ -2189,7 +2200,7 @@ function getLogs(tok) {
 }
 
 // ============== Nightly job — backup copy + retention, counter pruning, old reset links, open-days index ==============
-var BACKUP_PREFIX = 'Drink Shop backup ';
+var BACKUP_PREFIX = 'Respaldo Tienda de Bebidas ';
 // editor / trigger only: a web visitor runs as the owner with a different (or blank) active user, so it is refused
 var ownerRun_ = function(){ var a = Session.getActiveUser().getEmail(), e = Session.getEffectiveUser().getEmail(); return !!a && a === e; };
 function backup_() {
@@ -2218,11 +2229,11 @@ function purgeResets_() {
   return rows.length - keep.length;
 }
 function nightlyJob() {
-  if (!ownerRun_()) return err_('Not allowed — this runs from its nightly trigger');
+  if (!ownerRun_()) return err_('No permitido — esto se ejecuta desde su activador nocturno');
   var out = { pruned:pruneCounters_(), resets:withLock_(purgeResets_), open_days:openScan_().dropped };
   if (PropertiesService.getScriptProperties().getProperty('BACKUP_LAST') !== todayYmd_()) { try { out.backup = backup_(); } catch (e) { out.backup = { error:String((e && e.message) || e) }; } }
   out.daily_mail = mailSend_('shop.daily', null, settings_(), { day:addDays_(todayYmd_(), -1) });
-  addLog_('system', 'Nightly Job', 'counters pruned ' + out.pruned + ' · reset links purged ' + out.resets + ' · open days dropped ' + out.open_days + (out.backup ? ' · backup ' + (out.backup.name || out.backup.error) : ''));
+  addLog_('system', 'Tarea Nocturna', 'contadores depurados ' + out.pruned + ' · enlaces de restablecimiento depurados ' + out.resets + ' · días abiertos eliminados ' + out.open_days + (out.backup ? ' · respaldo ' + (out.backup.name || out.backup.error) : ''));
   return ok_(out);
 }
 // ONE nightly trigger (02:00 script time); re-installing replaces it
@@ -2231,12 +2242,12 @@ function installNightly_() {
   ScriptApp.newTrigger('nightlyJob').timeBased().atHour(2).everyDays(1).create();
 }
 function installNightlyTrigger(tok) {
-  return api_(tok, 'settings', 'e', function(me){ installNightly_(); addLog_(me.u, 'Nightly Trigger Installed', '02:00 daily');
-    return ok_({ message:'Nightly job installed — backup and clean-up run every night at 02:00' }); });
+  return api_(tok, 'settings', 'e', function(me){ installNightly_(); addLog_(me.u, 'Activador Nocturno Instalado', '02:00 diario');
+    return ok_({ message:'Tarea nocturna instalada — el respaldo y la limpieza se ejecutan todas las noches a las 02:00' }); });
 }
 function backupNow(tok) {
-  return api_(tok, 'settings', 'e', function(me){ var b = backup_(); addLog_(me.u, 'Backup Made', b.name + (b.removed ? ' · ' + b.removed + ' old removed' : ''));
-    return ok_({ message:'Backup saved as "' + b.name + '"' + (b.removed ? ' · ' + b.removed + ' old backup(s) removed' : '') }); });
+  return api_(tok, 'settings', 'e', function(me){ var b = backup_(); addLog_(me.u, 'Respaldo Realizado', b.name + (b.removed ? ' · ' + b.removed + ' antiguos eliminados' : ''));
+    return ok_({ message:'Respaldo guardado como "' + b.name + '"' + (b.removed ? ' · ' + b.removed + ' respaldo(s) antiguo(s) eliminado(s)' : '') }); });
 }
 function getMaintenance(tok) {
   return api_(tok, 'settings', 'e', function(){ var p = PropertiesService.getScriptProperties();
@@ -2247,38 +2258,38 @@ function getMaintenance(tok) {
 function sendTestEmail(tok) {
   return api_(tok, 'settings', 'e', function(me){
     var s = settings_(), to = s.notify_shop_email || s.shop_email;
-    if (!to || !String(to).split(', ').every(function(x){ return EMAIL_RX.test(x); })) return err_('Save a shop or notification email first');
-    if (MailApp.getRemainingDailyQuota() < 1) return err_("Today's email limit is used up — it resets tomorrow");
-    MailApp.sendEmail({ to:to, subject:s.shop_name + ' — test email (sample new order)', htmlBody:mailOf_('shop.new_order', sampleOrder_(), s).html, name:String(s.shop_name || 'Shop').slice(0, 60) });
-    addLog_(me.u, 'Test Email', 'Sent to ' + to);
-    return ok_({ message:'Test email sent to ' + to });
+    if (!to || !String(to).split(', ').every(function(x){ return EMAIL_RX.test(x); })) return err_('Guarda primero un correo de la tienda o de notificaciones');
+    if (MailApp.getRemainingDailyQuota() < 1) return err_("El límite de correos de hoy se ha agotado — se restablecerá mañana");
+    MailApp.sendEmail({ to:to, subject:s.shop_name + ' — correo de prueba (ejemplo de nuevo pedido)', htmlBody:mailOf_('shop.new_order', sampleOrder_(), s).html, name:String(s.shop_name || 'Tienda').slice(0, 60) });
+    addLog_(me.u, 'Correo de Prueba', 'Enviado a ' + to);
+    return ok_({ message:'Correo de prueba enviado a ' + to });
   });
 }
 // preview any event with the newest real order (or a sample) — nothing is sent
 function previewEmail(tok, ev) {
   return api_(tok, 'settings', 'v', function(){
-    if (MAIL_EVENTS.indexOf(ev) === -1) return err_('Unknown email');
+    if (MAIL_EVENTS.indexOf(ev) === -1) return err_('Correo desconocido');
     var s = settings_(), o = sampleOrder_(), x = { name:'Customer 1', email:'customer1@demo.com', phone:'03001000002', day:addDays_(todayYmd_(), -1), left:2 };
-    if (ev === 'customer.rejected' && !o.reject_reason) o.reject_reason = "Amount doesn't match";
-    if (ev === 'customer.cancelled' && !o.cancel_reason) o.cancel_reason = 'Out of an ingredient';
+    if (ev === 'customer.rejected' && !o.reject_reason) o.reject_reason = "El monto no coincide";
+    if (ev === 'customer.cancelled' && !o.cancel_reason) o.cancel_reason = 'Falta de un ingrediente';
     var m = mailOf_(ev, o, s, x);
-    return ok_({ subject:m.subject, html:m.html, to:m.to || (ev.indexOf('shop.') === 0 ? '(no notification email yet)' : "(the customer's email)") });
+    return ok_({ subject:m.subject, html:m.html, to:m.to || (ev.indexOf('shop.') === 0 ? '(sin correo de notificación aún)' : "(correo del cliente)") });
   });
 }
 // the newest order of the last 30 days, else a made-up one — for the preview and the test email
 function sampleOrder_() {
   var L = sh_(ORDER_SHEET) ? JDB.between(ORDER_SHEET, addDays_(todayYmd_(), -30), null) : [];
   var o = L.sort(function(a, b){ return a.placed_at < b.placed_at ? 1 : -1; })[0];
-  return o ? JSON.parse(JSON.stringify(o)) : { short_no:'#001', order_no:'ORD-' + todayYmd_().replace(/-/g, '') + '-0001', customer_name:'Customer 1', customer_phone:'03001000002', customer_email:'customer1@demo.com',
-    items:[{ qty:2, product_name:'Classic Milk Tea', size_name:'Large', sugar:'Normal', ice:'Less ice', addons:[{ name:'Tapioca pearls' }], line_total:9.6 }], subtotal:9.6, delivery_fee:0, grand_total:9.6,
-    payment_snapshot:{ name:'Wallet QR' }, fulfilment:'PICKUP', pickup_mode:'ASAP', track_token:'', payment_attempt:1 };
+  return o ? JSON.parse(JSON.stringify(o)) : { short_no:'#001', order_no:'ORD-' + todayYmd_().replace(/-/g, '') + '-0001', customer_name:'Cliente 1', customer_phone:'3001234567', customer_email:'cliente1@demo.com',
+    items:[{ qty:2, product_name:'Té con Leche Clásico', size_name:'Grande', sugar:'Normal', ice:'Menos hielo', addons:[{ name:'Perlas de tapioca' }], line_total:29000 }], subtotal:29000, delivery_fee:0, grand_total:29000,
+    payment_snapshot:{ name:'Billetera QR (Nequi)' }, fulfilment:'PICKUP', pickup_mode:'ASAP', track_token:'', payment_attempt:1 };
 }
 
 // ============== Setup Demo Data ==============
 // generic placeholders only — YouTube-safe, no real PII
-var DEMO_SHOP = { shop_name:'Demo Drinks', shop_address:'Shop 1, Street 1, Demo City', shop_phone:'03001000001', shop_email:'shop@demo.com',
-  map_url:'https://maps.google.com/?q=Demo+City', about_text:'Fresh drinks made to order, your way — pick your size, sweetness, ice and extras.',
-  hero_image:demoPhoto_('1551024709-8f23befc6f87', 1800, 700), hero_title:'Your drink, your way', hero_subtitle:'Pick a drink, add your extras, pay by QR — ready when you arrive.', footer_note:'Thank you — see you again!' };
+var DEMO_SHOP = { shop_name:'Bebidas Demo', shop_address:'Carrera 7 # 71-21, Bogotá, Colombia', shop_phone:'+57 300 123 4567', shop_email:'tienda@demo.com',
+  map_url:'https://maps.google.com/?q=Bogota+Colombia', about_text:'Bebidas frescas preparadas a tu gusto — elige tamaño, nivel de azúcar, hielo y complementos.',
+  hero_image:demoPhoto_('1551024709-8f23befc6f87', 1800, 700), hero_title:'Tu bebida, a tu gusto', hero_subtitle:'Elige tu bebida, agrega tus extras, paga con Nequi o transferencia — lista cuando llegues.', footer_note:'¡Muchas gracias por tu compra — esperamos verte pronto!' };
 var daysAgo_ = function(n, hhmm){ var d = new Date(Date.now() - n * 864e5), p = (hhmm || '09:00').split(':');
   d.setHours(+p[0], +p[1], 0, 0); return d.toISOString(); };
 
@@ -2287,7 +2298,7 @@ function setupDemoData() {
   try {
     // editor-only: from the deployed web app getActiveUser() is blank, so a visitor calling it is refused
     if (Session.getActiveUser().getEmail() !== Session.getEffectiveUser().getEmail())
-      return err_('Not allowed — run setupDemoData from the Apps Script editor');
+      return err_('No permitido — ejecuta setupDemoData desde el editor de Apps Script');
 
     _m = {};                                                                     // sheets are about to be dropped — drop the handles too
     var ss = ss_(), temp = ss.insertSheet('__temp_' + Date.now());               // a spreadsheet must always keep >=1 sheet
@@ -2313,10 +2324,10 @@ function setupDemoData() {
     }));
 
     var demoLogs = [
-      ['admin', 'System Setup', 'Demo data initialized'], ['admin', 'Login Success', 'User logged in successfully'],
-      ['admin', 'SETTINGS_SAVED', 'Shop details updated'], ['customer1@demo.com', 'SIGNUP', 'Customer account created'],
-      ['customer2@demo.com', 'SIGNUP', 'Customer account created'], ['customer1@demo.com', 'Login Success', 'User logged in successfully'],
-      ['admin', 'Permissions Updated', 'Customer · about · v=0']
+      ['admin', 'Configuración del Sistema', 'Datos de prueba inicializados'], ['admin', 'Inicio Exitoso', 'Usuario inició sesión exitosamente'],
+      ['admin', 'AJUSTES_GUARDADOS', 'Detalles de la tienda actualizados'], ['customer1@demo.com', 'REGISTRO', 'Cuenta de cliente creada'],
+      ['customer2@demo.com', 'REGISTRO', 'Cuenta de cliente creada'], ['customer1@demo.com', 'Inicio Exitoso', 'Usuario inició sesión exitosamente'],
+      ['admin', 'Permisos Actualizados', 'Customer · about · v=0']
     ], m = demoLogs.length;
     putText_(logsSheet, 2, demoLogs.map(function(l, i){ return [new Date(Date.now() - (m - i) * 7200000).toISOString(), l[0], l[1], l[2]]; }));   // 2h apart
 
@@ -2329,7 +2340,7 @@ function setupDemoData() {
     ss.deleteSheet(temp);
     _m = {};
     try { installNightly_(); } catch (e) {}                                       // the nightly job arms itself on install
-    addLog_('admin', 'System Setup', 'Demo data initialized');
-    return ok_({ message:'Demo data created. Logins: admin / admin123 · customer1@demo.com / customer123' });
-  } catch (e) { return err_('Setup failed: ' + ((e && e.user) || (e && e.message) || e)); }
+    addLog_('admin', 'Configuración del Sistema', 'Datos de prueba inicializados');
+    return ok_({ message:'Datos de prueba creados. Accesos: admin / admin123 · customer1@demo.com / customer123' });
+  } catch (e) { return err_('Falló la configuración: ' + ((e && e.user) || (e && e.message) || e)); }
 }

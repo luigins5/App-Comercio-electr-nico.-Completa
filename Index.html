@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>Drink Shop</title>
+  <title>Tienda de Bebidas</title>
 
   <!--
   Developed by Mohammad Rameez Imdad (Rameez Scripts)
@@ -13,9 +13,9 @@
   YouTube: https://www.youtube.com/@rameezimdad (Subscribe for more!)
   -->
 
-  <!-- theme: apply saved palette BEFORE paint (no flash on first load). order: server default -> this device's last pick -->
+  <!-- tema: aplicar la paleta guardada ANTES del renderizado (evita parpadeos en la primera carga). Orden: predeterminado del servidor -> última elección en este dispositivo -->
   <script>window.__APP_THEME_RAW__ = '<?!= defaultThemeVars ?>'; window.__APP_THEME_ID__ = '<?!= defaultThemeId ?>';</script>
-  <!-- deep links (?reset= / ?track= / ?page=) — the sandbox iframe can't read the top URL itself; server strips them to [A-Za-z0-9-] -->
+  <!-- enlaces directos (?reset= / ?track= / ?page=) — el iframe del sandbox no puede leer la URL principal por sí mismo; el servidor los filtra a [A-Za-z0-9-] -->
   <script>window.__RESET_TOKEN__ = '<?= resetToken ?>'; window.__TRACK_TOKEN__ = '<?= trackToken ?>'; window.__START_PAGE__ = '<?= startPage ?>';</script>
   <script>
     (function () {
@@ -23,19 +23,19 @@
       var put = function (v) {
         if (!v) return;
         try { if (typeof v === 'string') v = JSON.parse(v); } catch (e) { return; }
-        if (v && v.vars) v = v.vars; // support {themeId,vars} shape
+        if (v && v.vars) v = v.vars; // soporte de estructura {themeId,vars}
         Object.keys(v || {}).forEach(function (k) { if (k.indexOf('--') === 0) root.style.setProperty(k, v[k]); });
       };
-      try { put(window.__APP_THEME_RAW__); } catch (e) {}          // global default (admin-set)
-      try { put(localStorage.getItem('app_theme_vars')); } catch (e) {} // per-device override wins
+      try { put(window.__APP_THEME_RAW__); } catch (e) {}          // predeterminado global (definido por admin)
+      try { put(localStorage.getItem('app_theme_vars')); } catch (e) {} // la anulación por dispositivo tiene prioridad
     })();
   </script>
 
-  <!-- CDN Dependencies (2 origins; Babel + jsPDF load on demand from JavaScript.html) -->
+  <!-- Dependencias CDN (2 orígenes; Babel + jsPDF se cargan bajo demanda desde JavaScript.html) -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <!-- storefront type: Poppins (text) + Anton (banner titles), self-hosted on jsDelivr -->
+  <!-- tipografía de la tienda: Poppins (texto) + Anton (títulos de banners), alojadas en jsDelivr -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/poppins@5.1.0/400.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/poppins@5.1.0/600.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/poppins@5.1.0/800.css">
